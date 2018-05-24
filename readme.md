@@ -8,19 +8,19 @@ There are some classes :
 
 ### Commands:
 ## Normal user commands:
-- login username
-- logoff
-- list - list all available chat groups
-- create <group>
-- request <group>
-- join <group>
-- leave <group>
+- /login username
+- /logoff
+- /list - list all available chat groups
+- /create <group>
+- /request <group>
+- /join <group>
+- /leave <group>
 ## Admin commands:
-- add <group> <user> - add an user to a group
-- kick <group> <user> [<reason>] - remove an user from a group
-- delete <group>
-- promote <group> <user> - make an user admin on that group
-- demote <group> <user> - transforms the role of an admin to normal user on that group
+- /add <group> <user> - add an user to a group
+- /kick <group> <user> [<reason>] - remove an user from a group
+- /delete <group>
+- /promote <group> <user> - make an user admin on that group
+- /demote <group> <user> - transforms the role of an admin to normal user on that group
 
 Server bot jobs:
 - When a user logs in, broadcast a message to all users [not affiliated to a group]

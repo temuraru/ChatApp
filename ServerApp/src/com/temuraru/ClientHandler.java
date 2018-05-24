@@ -48,10 +48,17 @@ public class ClientHandler extends Thread {
 
         BufferedReader buffer = new BufferedReader(new InputStreamReader(clientInputStream));
         String line;
+        String msg;
         while ((line = buffer.readLine()) != null) {
+            msg = "Client "+clientId+" typed: " + line + "\n";
             String[] commandTokens = StringUtils.split(line);
             if (commandTokens != null && commandTokens.length > 0) {
                 String cmd = commandTokens[0].toLowerCase();
+                if (!cmd.startsWith("/")) {
+                    msg = "Wrong command format! Type /help for a list of available commands!";
+                    break;
+                }
+                cmd = cmd.replaceFirst("/", "");
                 if ("quit".equals(cmd)) {
                     break;
                 } else if ("login".equals(cmd)) {
@@ -62,7 +69,6 @@ public class ClientHandler extends Thread {
                 }
             }
 
-            String msg = "Client "+clientId+" typed: " + line + "\n";
             clientOutputStream.write(msg.getBytes());
         }
 
