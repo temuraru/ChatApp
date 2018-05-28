@@ -56,3 +56,15 @@ In a group, an admin can:
 - kick users from the group (reason for kicking [because!])
 - promote/demote users to/from admin role
 
+Client interface:
+- if not logged-in, login button with random username prepared
+- main group tab active, even for not logged-in clients
+- sidebar with available groups and "create new group" section with input field & button
+
+
+
+Each tab has a conversation field and am input field + Send button at the bottom
+The input field can send messages to the group/another client or commands (statements starting with / or \) to the server
+Tab name = group name or username
+
+

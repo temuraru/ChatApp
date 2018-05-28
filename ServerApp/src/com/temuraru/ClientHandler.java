@@ -6,12 +6,17 @@ import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ClientHandler extends Thread {
     public static final String ROLE_GUEST = "guest";
     public static final String ROLE_USER = "user";
     public static final String ROLE_ADMIN = "admin";
     public static final String ROLE_SUPERADMIN = "superadmin";
+    public static final String ROLE_SERVER_BOT = "serverbot";
+    public static final String[][] commands = {{"Apple", "Banana"}, {"Pork", "Beef", "Chicken"}, {"Carrots"} };
+
 
     private Server server;
     private final Socket clientSocket;
@@ -19,12 +24,21 @@ public class ClientHandler extends Thread {
     private String role;
     private String username;
 
-    public ClientHandler(Server server, Socket clientSocket, int clientId) throws IOException {
+    public ClientHandler(Server server, Socket clientSocket, int clientId, boolean isServerBot) throws IOException {
         this.server = server;
         this.clientSocket = clientSocket;
         this.clientId = clientId;
-        this.role = ROLE_GUEST;
+        this.role = isServerBot ? ROLE_SERVER_BOT : ROLE_GUEST;
         this.username = "guest" + clientId;
+
+        Map<String, String[]> map = new HashMap<String, String[]>();
+
+        map.put(ROLE_GUEST, new String[] {"login"});
+        map.put(ROLE_USER, new String[] {"create", "join", "leave", "talk"});
+        map.put(ROLE_ADMIN, new String[] {"kick", "invite", "promote", "demote"});
+        map.put(ROLE_SUPERADMIN, new String[] {"delete"});
+
+        System.out.println(String.join(",", map.get(ROLE_ADMIN)));
     }
 
     @Override
@@ -36,12 +50,6 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
-
-    public void receiveMessage(String msg) throws IOException {
-        OutputStream clientOutputStream = clientSocket.getOutputStream();
-        clientOutputStream.write(msg.getBytes());
-    }
-
     private void handleClientSocket() throws IOException {
         OutputStream clientOutputStream = clientSocket.getOutputStream();
         InputStream clientInputStream = clientSocket.getInputStream();
@@ -76,30 +84,7 @@ public class ClientHandler extends Thread {
     }
 
     private boolean handleLogin(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
-        String error = "";
-        String choosenUsername = username;
-        if (commandTokens.length != 2) {
-            error = "Invalid number of parameters for login command!";
-        } else {
-            choosenUsername = commandTokens[1].replaceAll("[^a-zA-Z0-9]+", "").replaceFirst("^[^a-zA-Z]+", "");
-            if (choosenUsername.length() > 15) {
-                choosenUsername = choosenUsername.substring(0,14);
-            }
-            if (choosenUsername.length() == 0) {
-                error = "Username invalid!";
-            } else {
-                ArrayList<String> forbiddenUsernamesList = new ArrayList<String>();
-                forbiddenUsernamesList.add("all");
-                forbiddenUsernamesList.add("user");
-                forbiddenUsernamesList.add("admin");
-                forbiddenUsernamesList.add("superadmin");
-                forbiddenUsernamesList.add("guest");
-
-                if (forbiddenUsernamesList.contains(choosenUsername)) {
-                    error = "Username is not allowed!";
-                }
-            }
-        }
+        String error = this.validateUsername(commandTokens);
 
         boolean result = true;
         if (error.length() > 0) {
@@ -108,13 +93,53 @@ public class ClientHandler extends Thread {
         } else {
             clientOutputStream.write("Login OK!\n".getBytes());
             server.broadcastMessage("User '" + username + "'- just logged in!\n");
-            System.out.println("User: '"+username+"' logged in as: "+choosenUsername+": " + clientSocket);
+            System.out.println("User: '"+username+"' logged in as: "+this.getUsername()+": " + clientSocket);
 
             setRole(ROLE_USER);
         }
 
         return result;
+    }
 
+    private String validateUsername(String[] commandTokens)
+    {
+        String error = "";
+        String chosenUsername = this.getUsername();
+        if (commandTokens.length != 2) {
+            error = "Invalid number of parameters for login command!";
+        } else {
+            chosenUsername = commandTokens[1].replaceAll("[^a-zA-Z0-9]+", "").replaceFirst("^[^a-zA-Z]+", "");
+            if (chosenUsername.length() > 15) {
+                chosenUsername = chosenUsername.substring(0,14);
+            }
+            if (chosenUsername.length() == 0) {
+                error = "Username invalid!";
+            } else {
+                ArrayList<String> forbiddenUsernamesList = new ArrayList<String>();
+                forbiddenUsernamesList.add("all");
+                forbiddenUsernamesList.add("user");
+                forbiddenUsernamesList.add("group");
+                forbiddenUsernamesList.add("admin");
+                forbiddenUsernamesList.add("serverbot");
+                forbiddenUsernamesList.add("superadmin");
+                forbiddenUsernamesList.add("guest");
+
+                if (forbiddenUsernamesList.contains(chosenUsername)) {
+                    error = "Username is not allowed!";
+                }
+            }
+        }
+        if (error.length() == 0) {
+            this.setUsername(chosenUsername);
+        }
+
+        return error;
+    }
+
+
+    public void receiveMessage(String msg) throws IOException {
+        OutputStream clientOutputStream = clientSocket.getOutputStream();
+        clientOutputStream.write(msg.getBytes());
     }
 
     private void handleClientSocket_v1() throws IOException, InterruptedException {
@@ -126,6 +151,14 @@ public class ClientHandler extends Thread {
         }
         clientSocket.close();
         System.out.println("Closed connection for client: " + clientSocket);
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getRole() {

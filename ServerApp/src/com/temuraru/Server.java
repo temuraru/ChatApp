@@ -17,8 +17,16 @@ public class Server extends Thread {
     public ArrayList<ClientHandler> getClientsList() {
         return clientsList;
     }
-    public ArrayList<GroupHandler> getGroupsList() {
-        return groupsList;
+    public ArrayList<GroupHandler> getGroupsList() { return groupsList; }
+
+    public ClientHandler getServerBot() throws Exception {
+        for (ClientHandler client: clientsList) {
+            if (client.getRole().equals(ClientHandler.ROLE_SERVER_BOT)) {
+                return client;
+            }
+        }
+
+        throw new Exception("No client with role serverbot found!!");
     }
 
     public void broadcastMessage(String msg) throws IOException {
@@ -29,15 +37,22 @@ public class Server extends Thread {
 
     @Override
     public void run() {
+        Socket clientSocket;
+        ClientHandler clientHandler;
         int clientId = 0;
         try {
             ServerSocket ss = new ServerSocket(port);
             System.out.println("Server started on port: "+port+"!");
-            while (true) {
-                Socket clientSocket = ss.accept();
-                clientId++;
 
-                ClientHandler clientHandler = new ClientHandler(this, clientSocket, clientId);
+            clientSocket = ss.accept();
+            clientId++;
+            clientHandler = new ClientHandler(this, clientSocket, clientId, false);
+            clientsList.add(clientHandler);
+
+            while (true) {
+                clientSocket = ss.accept();
+                clientId++;
+                clientHandler = new ClientHandler(this, clientSocket, clientId, false);
                 clientsList.add(clientHandler);
                 clientHandler.start();
             }
