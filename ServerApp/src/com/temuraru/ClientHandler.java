@@ -10,35 +10,30 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ClientHandler extends Thread {
-    public static final String ROLE_GUEST = "guest";
-    public static final String ROLE_USER = "user";
-    public static final String ROLE_ADMIN = "admin";
-    public static final String ROLE_SUPERADMIN = "superadmin";
-    public static final String ROLE_SERVER_BOT = "serverbot";
-    public static final String[][] commands = {{"Apple", "Banana"}, {"Pork", "Beef", "Chicken"}, {"Carrots"} };
 
-
+    private final String currentGroup;
     private Server server;
     private final Socket clientSocket;
     private int clientId;
     private String role;
     private String username;
+//    private ArrayList<GroupHandler> groupsList = new ArrayList<>();
+    private Map<String, String> groupsList = new HashMap<String, String>();
+
 
     public ClientHandler(Server server, Socket clientSocket, int clientId, boolean isServerBot) throws IOException {
         this.server = server;
         this.clientSocket = clientSocket;
         this.clientId = clientId;
-        this.role = isServerBot ? ROLE_SERVER_BOT : ROLE_GUEST;
+        this.role = isServerBot ? Server.ROLE_SERVER_BOT : Server.ROLE_GUEST;
         this.username = "guest" + clientId;
+        this.currentGroup = Server.GROUP_MAIN;
+        updateRoleInCurrentGroup();
 
-        Map<String, String[]> map = new HashMap<String, String[]>();
+    }
 
-        map.put(ROLE_GUEST, new String[] {"login"});
-        map.put(ROLE_USER, new String[] {"create", "join", "leave", "talk"});
-        map.put(ROLE_ADMIN, new String[] {"kick", "invite", "promote", "demote"});
-        map.put(ROLE_SUPERADMIN, new String[] {"delete"});
-
-        System.out.println(String.join(",", map.get(ROLE_ADMIN)));
+    private void updateRoleInCurrentGroup() {
+        groupsList.put(this.getCurrentGroup(), this.getRole());
     }
 
     @Override
@@ -50,6 +45,15 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
+
+    public String getCurrentGroup() {
+        return currentGroup;
+    }
+
+    public String getCurrentRole() {
+        return groupsList.get(currentGroup);
+    }
+
     private void handleClientSocket() throws IOException {
         OutputStream clientOutputStream = clientSocket.getOutputStream();
         InputStream clientInputStream = clientSocket.getInputStream();
@@ -58,6 +62,11 @@ public class ClientHandler extends Thread {
         String line;
         String msg;
         while ((line = buffer.readLine()) != null) {
+            String groupInfo ="Your current group is: "+this.getCurrentGroup()+" and your current role is: "+this.getCurrentRole()+"!!!";
+//            String[] commandsForRole = server.getCommandsForRole(this.getCurrentRole());
+//            groupInfo += " Your commands are: "+String.join(",", commandsForRole);
+//            System.out.println(groupInfo);
+//            clientOutputStream.write(groupInfo.getBytes());
             msg = "Client "+clientId+" typed: " + line + "\n";
             String[] commandTokens = StringUtils.split(line);
             if (commandTokens != null && commandTokens.length > 0) {
@@ -95,7 +104,7 @@ public class ClientHandler extends Thread {
             server.broadcastMessage("User '" + username + "'- just logged in!\n");
             System.out.println("User: '"+username+"' logged in as: "+this.getUsername()+": " + clientSocket);
 
-            setRole(ROLE_USER);
+            setRole(Server.ROLE_USER);
         }
 
         return result;
