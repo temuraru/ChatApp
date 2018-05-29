@@ -4,10 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class ClientHandler extends Thread {
 
@@ -58,41 +55,73 @@ public class ClientHandler extends Thread {
         OutputStream clientOutputStream = clientSocket.getOutputStream();
         InputStream clientInputStream = clientSocket.getInputStream();
 
-        BufferedReader buffer = new BufferedReader(new InputStreamReader(clientInputStream));
-        String line;
-        String msg;
-        while ((line = buffer.readLine()) != null) {
-            String groupInfo ="Your current group is: "+this.getCurrentGroup()+" and your current role is: "+this.getCurrentRole()+"!!!";
-//            String[] commandsForRole = server.getCommandsForRole(this.getCurrentRole());
-//            groupInfo += " Your commands are: "+String.join(",", commandsForRole);
-//            System.out.println(groupInfo);
-//            clientOutputStream.write(groupInfo.getBytes());
-            msg = "Client "+clientId+" typed: " + line + "\n";
-            String[] commandTokens = StringUtils.split(line);
-            if (commandTokens != null && commandTokens.length > 0) {
-                String cmd = commandTokens[0].toLowerCase();
-                if (!cmd.startsWith("/")) {
-                    msg = "Wrong command format! Type /help for a list of available commands!";
-                    break;
-                }
-                cmd = cmd.replaceFirst("/", "");
-                if ("quit".equals(cmd)) {
-                    break;
-                } else if ("login".equals(cmd)) {
-                    boolean loggedIn = handleLogin(clientOutputStream, commandTokens);
-                    if (loggedIn) {
-
-                    }
-                }
-            }
-
-            clientOutputStream.write(msg.getBytes());
-        }
+        outputGroupInfo(clientOutputStream);
+        processCommands(clientOutputStream, clientInputStream);
 
         goodbye();
     }
 
+    private void processCommands(OutputStream clientOutputStream, InputStream clientInputStream) throws IOException {
+        BufferedReader buffer = new BufferedReader(new InputStreamReader(clientInputStream));
+
+        String line;
+        String msg;
+        while ((line = buffer.readLine()) != null) {
+            String[] commandTokens = StringUtils.split(line);
+            if (commandTokens != null && commandTokens.length > 0) {
+                String cmd = commandTokens[0].toLowerCase();
+                if (!cmd.startsWith("/")) {
+                    msg = getUsername() + " (client "+clientId+") typed:\n" + line + "\n";
+                    server.broadcastMessageToGroup(msg, currentGroup, getUsername());
+
+                    clientOutputStream.write(msg.getBytes());
+                    continue;
+                }
+                cmd = cmd.replaceFirst("/", "");
+
+                String[] currentRoleCommands = server.getCommandsForRole(getCurrentRole());
+                if (!Arrays.asList(currentRoleCommands).contains(cmd)) {
+                    msg = "Unknown command for your group/role! Type /help for a list of available commands!\n";
+                    clientOutputStream.write(msg.getBytes());
+                    continue;
+                }
+
+                processCommand(cmd, commandTokens, clientOutputStream);
+            }
+
+//            clientOutputStream.write(msg.getBytes());
+        }
+    }
+
+    private void processCommand(String cmd, String[] commandTokens, OutputStream clientOutputStream) throws IOException {
+        switch (cmd) {
+            case "quit":
+                break;
+            case "help":
+                server.outputHelp(clientOutputStream, this.getCurrentRole());
+                break;
+            case "login":
+                handleLogin(clientOutputStream, commandTokens);
+                break;
+            case "change":
+                handleChange(clientOutputStream, commandTokens);
+                break;
+            case "list":
+                server.outputGroups(clientOutputStream);
+                break;
+        }
+    }
+
+    private void outputGroupInfo(OutputStream clientOutputStream) throws IOException {
+        String[] commandsForRole = server.getCommandsForRole(this.getCurrentRole());
+
+        String groupInfo ="Your current group is: "+this.getCurrentGroup()+" and your current role is: "+this.getCurrentRole()+"!!!\n";
+        groupInfo += "Your commands are: /"+String.join(", /", commandsForRole)+"\n";
+        clientOutputStream.write(groupInfo.getBytes());
+    }
+
     private boolean handleLogin(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
+        String currentUsername = getUsername();
         String error = this.validateUsername(commandTokens);
 
         boolean result = true;
@@ -100,11 +129,40 @@ public class ClientHandler extends Thread {
             result = false;
             clientOutputStream.write(("Login failed! "+error).getBytes());
         } else {
-            clientOutputStream.write("Login OK!\n".getBytes());
-            server.broadcastMessage("User '" + username + "'- just logged in!\n");
-            System.out.println("User: '"+username+"' logged in as: "+this.getUsername()+": " + clientSocket);
+            if (!isLoggedIn()) {
+                result = false;
+                clientOutputStream.write(("You are already logged in! If you need to change the username, use the command: '/change new_username' !\n").getBytes());
+            } else {
+                clientOutputStream.write("Login OK!\n".getBytes());
+                String msg = "User '" + currentUsername + "' just logged in as '" + username + "'!\n";
+                server.broadcastMessage(msg, true);
 
-            setRole(Server.ROLE_USER);
+                setRole(Server.ROLE_USER);
+
+                updateRoleInCurrentGroup();
+                outputGroupInfo(clientOutputStream);
+            }
+        }
+
+        return result;
+    }
+
+    private boolean isLoggedIn() {
+        return getCurrentRole().equals(server.ROLE_GUEST);
+    }
+
+    private boolean handleChange(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
+        String currentUsername = getUsername();
+        String error = this.validateUsername(commandTokens);
+
+        boolean result = true;
+        if (error.length() > 0) {
+            result = false;
+            clientOutputStream.write(("Changing username failed! "+error).getBytes());
+        } else {
+            clientOutputStream.write("Changing username OK!\n".getBytes());
+            String msg = "User '" + currentUsername + "' just transformed into '" + username + "'!\n";
+            server.broadcastMessage(msg, true);
         }
 
         return result;
@@ -113,31 +171,40 @@ public class ClientHandler extends Thread {
     private String validateUsername(String[] commandTokens)
     {
         String error = "";
-        String chosenUsername = this.getUsername();
+        String currentUsername = this.getUsername();
+
         if (commandTokens.length != 2) {
             error = "Invalid number of parameters for login command!";
-        } else {
-            chosenUsername = commandTokens[1].replaceAll("[^a-zA-Z0-9]+", "").replaceFirst("^[^a-zA-Z]+", "");
-            if (chosenUsername.length() > 15) {
-                chosenUsername = chosenUsername.substring(0,14);
-            }
-            if (chosenUsername.length() == 0) {
-                error = "Username invalid!";
-            } else {
-                ArrayList<String> forbiddenUsernamesList = new ArrayList<String>();
-                forbiddenUsernamesList.add("all");
-                forbiddenUsernamesList.add("user");
-                forbiddenUsernamesList.add("group");
-                forbiddenUsernamesList.add("admin");
-                forbiddenUsernamesList.add("serverbot");
-                forbiddenUsernamesList.add("superadmin");
-                forbiddenUsernamesList.add("guest");
+            return error;
+        }
 
-                if (forbiddenUsernamesList.contains(chosenUsername)) {
-                    error = "Username is not allowed!";
-                }
+        String chosenUsername = commandTokens[1].replaceAll("[^a-zA-Z0-9]+", "").replaceFirst("^[^a-zA-Z]+", "");
+        if (chosenUsername.length() > 15) {
+            chosenUsername = chosenUsername.substring(0,14);
+        }
+        if (chosenUsername.equals(currentUsername)) {
+            error = "The current username is the same: "+currentUsername+"!";
+            return error;
+        }
+
+
+        if (chosenUsername.length() == 0) {
+            error = "Username invalid!";
+        } else {
+            ArrayList<String> forbiddenUsernamesList = new ArrayList<String>();
+            forbiddenUsernamesList.add("all");
+            forbiddenUsernamesList.add("user");
+            forbiddenUsernamesList.add("group");
+            forbiddenUsernamesList.add("admin");
+            forbiddenUsernamesList.add("serverbot");
+            forbiddenUsernamesList.add("superadmin");
+            forbiddenUsernamesList.add("guest");
+
+            if (forbiddenUsernamesList.contains(chosenUsername)) {
+                error = "Username is not allowed!";
             }
         }
+
         if (error.length() == 0) {
             this.setUsername(chosenUsername);
         }

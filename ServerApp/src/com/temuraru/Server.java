@@ -1,6 +1,7 @@
 package com.temuraru;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -15,60 +16,11 @@ public class Server extends Thread {
     private final int port;
     private ArrayList<ClientHandler> clientsList = new ArrayList<>();
     private ArrayList<GroupHandler> groupsList = new ArrayList<>();
-    private Map<String, String[]> commands;
+    private Map<String, String> commands;
 
     public Server(int port) {
         this.port = port;
         setCommands();
-    }
-
-    private void setCommands() {
-        commands = new HashMap<String, String[]>();
-
-        commands.put(ROLE_GUEST, new String[] {"login", "help"});
-        commands.put(ROLE_USER, new String[] {"create", "join", "leave", "talk"});
-        commands.put(ROLE_ADMIN, new String[] {"kick", "invite", "promote", "demote"});
-        commands.put(ROLE_SUPERADMIN, new String[] {"delete"});
-    }
-
-    public ArrayList<ClientHandler> getClientsList() {
-        return clientsList;
-    }
-    public ArrayList<GroupHandler> getGroupsList() { return groupsList; }
-
-    public ClientHandler getServerBot() throws Exception {
-        for (ClientHandler client: clientsList) {
-            if (client.getRole().equals(Server.ROLE_SERVER_BOT)) {
-                return client;
-            }
-        }
-
-        throw new Exception("No client with role serverbot found!!");
-    }
-
-    public String[] getCommandsForRole(String role) {
-        String[] roleCommands = {};
-        Iterator it = commands.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-
-//            System.out.println(pair.getValue());
-//            List list = new ArrayList(Arrays.asList(roleCommands));
-//            list.addAll(Arrays.asList(roleCommands));
-//            String[] newCommands = pair.getValue();
-//            Object[] c = list.toArray(newCommands);
-//            if (pair.getKey() == role) {
-//                System.out.println(c.toString());
-//                break;
-//            }
-        }
-        return commands.get(role);
-    }
-
-    public void broadcastMessage(String msg) throws IOException {
-        for (ClientHandler client: clientsList) {
-            client.receiveMessage(msg);
-        }
     }
 
     @Override
@@ -80,10 +32,11 @@ public class Server extends Thread {
             ServerSocket ss = new ServerSocket(port);
             System.out.println("Server started on port: "+port+"!");
 
-            clientSocket = ss.accept();
-            clientId++;
-            clientHandler = new ClientHandler(this, clientSocket, clientId, false);
-            clientsList.add(clientHandler);
+//            clientSocket = ss.accept();
+//            clientId++;
+//            clientHandler = new ClientHandler(this, clientSocket, clientId, true);
+//            clientsList.add(clientHandler);
+//            clientHandler.start();
 
             while (true) {
                 clientSocket = ss.accept();
@@ -96,4 +49,94 @@ public class Server extends Thread {
             e.printStackTrace();
         }
     }
+
+    public ClientHandler getServerBot() throws Exception {
+        for (ClientHandler client: clientsList) {
+            if (client.getRole().equals(Server.ROLE_SERVER_BOT)) {
+                return client;
+            }
+        }
+
+        throw new Exception("No client with role serverbot found!!");
+    }
+
+
+    private void setCommands() {
+        commands = new HashMap<String, String>();
+
+        commands.put(ROLE_GUEST, "login,help");
+        commands.put(ROLE_USER, "list,create,join,request,leave,talk,change");
+        commands.put(ROLE_ADMIN, "kick,invite,promote,demote");
+        commands.put(ROLE_SUPERADMIN, "delete");
+    }
+
+    public ArrayList<ClientHandler> getClientsList() {
+        return clientsList;
+    }
+
+    public ArrayList<GroupHandler> getGroupsList() {
+        return groupsList;
+    }
+
+    public String[] getCommandsForRole(String currentRole) {
+        String[] order = {ROLE_GUEST, ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN};
+        String newCommands = "";
+        for (String role:order) {
+            String roleCommands = commands.get(role);
+            newCommands = newCommands + ((newCommands.length() > 0 ? "," : "") + roleCommands);
+            if (role.equals(currentRole)) {
+                break;
+            }
+        }
+        String[] commands = newCommands.split(",");
+
+        return commands;
+    }
+
+    public void broadcastMessageToGroup(String msg, String destinationGroup) throws IOException {
+        for (ClientHandler client: clientsList) {
+            if (client.getCurrentGroup().equals(destinationGroup)) {
+                client.receiveMessage(msg);
+            }
+        }
+    }
+
+    public void broadcastMessageToGroup(String msg, String destinationGroup, String skipUsername) throws IOException {
+        for (ClientHandler client: clientsList) {
+            if (client.getUsername().equals(skipUsername)) {
+                continue;
+            }
+            if (client.getCurrentGroup().equals(destinationGroup)) {
+                client.receiveMessage(msg);
+            }
+        }
+    }
+
+    public void broadcastMessage(String msg) throws IOException {
+        for (ClientHandler client: clientsList) {
+            client.receiveMessage(msg);
+        }
+    }
+
+    public void broadcastMessage(String msg, boolean debug) throws IOException {
+        for (ClientHandler client: clientsList) {
+            client.receiveMessage(msg);
+        }
+        if (debug) {
+            System.out.println(msg);
+        }
+    }
+
+    public void outputGroups(OutputStream clientOutputStream) throws IOException {
+        ArrayList<GroupHandler> groupsList = this.getGroupsList();
+        String groupInfo = "Available groups on server: "+groupsList.toString()+"\n";
+        clientOutputStream.write(groupInfo.getBytes());
+    }
+
+    public void outputHelp(OutputStream clientOutputStream, String role) throws IOException {
+        String[] commandsForRole = this.getCommandsForRole(role);
+        String groupInfo = "Your commands are: /"+String.join(", /", commandsForRole)+"\n";
+        clientOutputStream.write(groupInfo.getBytes());
+    }
+
 }
