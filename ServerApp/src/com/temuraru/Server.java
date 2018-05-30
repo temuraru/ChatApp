@@ -129,7 +129,17 @@ public class Server extends Thread {
 
     public void outputGroups(OutputStream clientOutputStream) throws IOException {
         ArrayList<GroupHandler> groupsList = this.getGroupsList();
-        String groupInfo = "Available groups on server: "+groupsList.toString()+"\n";
+        String groupInfo;
+        if (groupsList.size() > 0) {
+            String groupsNames = "";
+            for (GroupHandler group: groupsList) {
+                groupsNames += (groupsNames.length() == 0 ? "" : ", ") + group.getName();
+            }
+            groupInfo = "Available groups on server: "+groupsNames+"\n";
+        } else {
+            groupInfo = "No groups on server!\n";
+
+        }
         clientOutputStream.write(groupInfo.getBytes());
     }
 

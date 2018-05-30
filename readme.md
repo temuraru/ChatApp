@@ -7,9 +7,13 @@ There are some classes :
 - ClientHandler - handles client
 
 ### Commands:
-## Normal user commands:
+## Guest commands:
 - /login username
+- /help
+- /quit
+## Normal user commands:
 - /logoff
+- /user new_username
 - /list - list all available chat groups
 - /create <group>
 - /request <group>
