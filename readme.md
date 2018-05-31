@@ -15,16 +15,21 @@ There are some classes :
 - /logoff
 - /user new_username
 - /list - list all available chat groups
-- /create <group>
-- /request <group>
+- /create <group> <type> # where type can be [public]|private|closed
+- /select <group> # set another group as the current group
+- /request <group> # request to be added to the group
 - /join <group>
 - /leave <group>
 ## Admin commands:
+- /groupname <new_name> # change the name of the current group
+- /changetype <group> <type> # where type can be [public]|private|closed
 - /add <group> <user> - add an user to a group
+- /invite <group> <user> - invite an user to a group
 - /kick <group> <user> [<reason>] - remove an user from a group
-- /delete <group>
 - /promote <group> <user> - make an user admin on that group
 - /demote <group> <user> - transforms the role of an admin to normal user on that group
+## SuperAdmin commands:
+- /delete <group>
 
 Server bot jobs:
 - When a user logs in, broadcast a message to all users [not affiliated to a group]
