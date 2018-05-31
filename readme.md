@@ -22,7 +22,7 @@ There are some classes :
 - /leave <group>
 ## Admin commands:
 - /groupname <new_name> # change the name of the current group
-- /changetype <group> <type> # where type can be [public]|private|closed
+- /grouptype <new_type> # where new_type can be [public]|private|closed
 - /add <group> <user> - add an user to a group
 - /invite <group> <user> - invite an user to a group
 - /kick <group> <user> [<reason>] - remove an user from a group

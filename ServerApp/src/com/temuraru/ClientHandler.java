@@ -1,6 +1,5 @@
 package com.temuraru;
 
-import javafx.scene.Group;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
@@ -9,37 +8,39 @@ import java.util.*;
 
 public class ClientHandler extends Thread {
 
-    private String currentGroup;
+    private Integer currentGroupId;
+    private GroupHandler currentGroup;
     private Server server;
-    private final Socket clientSocket;
+    private Socket clientSocket;
     private int clientId;
     private String role;
     private String username;
-
-    public Map<String, String> getGroupsList() {
-        return groupsList;
-    }
-
-    public void setGroupsList(Map<String, String> groupsList) {
-        this.groupsList = groupsList;
-    }
-
     //    private ArrayList<GroupHandler> groupsList = new ArrayList<>();
-    private Map<String, String> groupsList = new HashMap<String, String>();
+    private Map<Integer, String> groupsList = new HashMap<Integer, String>();
 
 
-    public ClientHandler(Server server, Socket clientSocket, int clientId, boolean isServerBot) throws IOException {
+    public ClientHandler(Server server, int clientId) throws IOException {
+        this.server = server;
+        this.clientId = clientId;
+        this.currentGroupId = Server.MAIN_GROUP_ID;
+        this.role = Server.ROLE_SERVER_BOT ;
+        this.username = "guest" + clientId;
+        setCurrentGroup(Server.getMainGroup());
+        updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, Server.ROLE_SERVER_BOT);
+    }
+    public ClientHandler(Server server, Socket clientSocket, int clientId) throws IOException {
         this.server = server;
         this.clientSocket = clientSocket;
         this.clientId = clientId;
-        this.role = isServerBot ? Server.ROLE_SERVER_BOT : Server.ROLE_GUEST;
+        this.currentGroupId = Server.MAIN_GROUP_ID;
+        this.role = Server.ROLE_GUEST;
         this.username = "guest" + clientId;
-        setCurrentGroup(Server.GROUP_MAIN);
-        updateRoleInCurrentGroup();
+        setCurrentGroup(Server.getMainGroup());
+        updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, this.role);
     }
 
-    private void updateRoleInCurrentGroup() {
-        groupsList.put(this.getCurrentGroup(), this.getRole());
+    private void updateRoleInCurrentGroup(Integer groupId, String groupRole) {
+        groupsList.put(groupId, groupRole);
     }
 
     @Override
@@ -47,24 +48,36 @@ public class ClientHandler extends Thread {
         try {
             welcome();
             handleClientSocket();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public String getCurrentGroup() {
+    public Integer getCurrentGroupId() {
+        return currentGroupId;
+    }
+
+    public void setCurrentGroupId(Integer currentGroupId) {
+        this.currentGroupId = currentGroupId;
+    }
+
+    public Map<Integer, String> getGroupsList() {
+        return groupsList;
+    }
+
+    public GroupHandler getCurrentGroup() {
         return currentGroup;
     }
 
-    public void setCurrentGroup(String currentGroup) {
+    public void setCurrentGroup(GroupHandler currentGroup) {
         this.currentGroup = currentGroup;
     }
 
     public String getCurrentRole() {
-        return groupsList.get(currentGroup);
+        return groupsList.get(getCurrentGroup().getId());
     }
 
-    private void handleClientSocket() throws IOException {
+    private void handleClientSocket() throws Exception {
         OutputStream clientOutputStream = clientSocket.getOutputStream();
         InputStream clientInputStream = clientSocket.getInputStream();
 
@@ -74,13 +87,11 @@ public class ClientHandler extends Thread {
         goodbye();
     }
 
-    private void processCommands(OutputStream clientOutputStream, InputStream clientInputStream) throws IOException {
+    private void processCommands(OutputStream clientOutputStream, InputStream clientInputStream) throws Exception {
         BufferedReader buffer = new BufferedReader(new InputStreamReader(clientInputStream));
 
-        Scanner scanner = new Scanner(clientInputStream);
         String msg;
         String line = buffer.readLine();
-
         while (line != null) {
             System.out.println("new line: " + line);
             String[] commandTokens = StringUtils.split(line);
@@ -89,7 +100,7 @@ public class ClientHandler extends Thread {
                 String validCommand = cmd;
                 if (!cmd.startsWith("/")) {
                     msg = getUsername() + " (client "+clientId+") typed:\n" + line + "\n";
-                    server.broadcastMessageToGroup(msg, currentGroup, getUsername());
+                    server.broadcastMessageToGroup(msg, getCurrentGroupId(), getUsername());
 
                     clientOutputStream.write(msg.getBytes());
                     validCommand = "";
@@ -118,9 +129,12 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void processCommand(String cmd, String[] commandTokens, OutputStream clientOutputStream) throws IOException {
+    private void processCommand(String cmd, String[] commandTokens, OutputStream clientOutputStream) throws Exception {
+        String error = "";
         switch (cmd) {
             case "quit":
+            case "logoff":
+                goodbye();
                 break;
             case "help":
                 server.outputHelp(clientOutputStream, this.getCurrentRole());
@@ -128,20 +142,26 @@ public class ClientHandler extends Thread {
             case "login":
                 handleLogin(clientOutputStream, commandTokens);
                 break;
-            case "logoff":
-                goodbye();
-                break;
             case "user":
-                handleChange(commandTokens);
+                changeUsername(commandTokens);
                 break;
             case "list":
                 server.outputGroups(clientOutputStream);
                 break;
             case "create":
+                if (commandTokens.length != 2) {
+                    error = "Invalid number of parameters!";
+                    error += "The correct format is: /create <group_name>";
+                }
                 createGroup(clientOutputStream, commandTokens);
                 break;
             case "select":
-                changeGroup(clientOutputStream, commandTokens);
+                if (commandTokens.length != 2) {
+                    error = "Invalid number of parameters!";
+                    error += "The correct format is: /select <new_group>";
+                } else {
+                    selectGroup(clientOutputStream, commandTokens);
+                }
                 break;
             case "request":
                 receiveMessage("Feature "+cmd+" not implemented yet!\n");
@@ -153,10 +173,10 @@ public class ClientHandler extends Thread {
                 receiveMessage("Feature "+cmd+" not implemented yet!\n");
                 break;
             case "groupname":
-                changeGroup(clientOutputStream, commandTokens);
+                changeGroupName(clientOutputStream, commandTokens);
                 break;
-            case "changetype":
-                receiveMessage("Feature "+cmd+" not implemented yet!\n");
+            case "grouptype":
+                changeGroupType(clientOutputStream, commandTokens);
                 break;
             case "add":
                 receiveMessage("Feature "+cmd+" not implemented yet!\n");
@@ -179,13 +199,29 @@ public class ClientHandler extends Thread {
         }
     }
 
+    private void changeGroupName(OutputStream clientOutputStream, String[] commandTokens) {
+    }
+
+    private void changeGroupType(OutputStream clientOutputStream, String[] commandTokens) throws Exception {
+        String newGroupType = commandTokens[1];
+
+        String groupRole = groupsList.get(getCurrentGroupId());
+        if (groupRole.length() > 0) {
+
+            server.broadcastMessageToGroup("User "+getUsername()+" changed the group type from "+getCurrentGroup()+"!\n", getCurrentGroupId());
+        } else {
+            receiveMessage("You are not allowed to make changes to the group "+getCurrentGroup()+" (since you're not even its member)!");
+        }
+    }
+
     private void deleteGroup() throws IOException {
-        if (groupsList.get(currentGroup).equals(Server.ROLE_SUPERADMIN)) {
-            server.broadcastMessageToGroup("This group is being deleted! Sorry!\n", currentGroup);
+        if (groupsList.get(currentGroupId).equals(Server.ROLE_SUPERADMIN)) {
+            server.broadcastMessageToGroup("This group is being deleted! Sorry!\n", getCurrentGroupId());
+
             ArrayList<ClientHandler> clientsList = server.getClientsList();
             for (ClientHandler client: clientsList) {
-                if (client.isMemberOf(currentGroup).length() > 0) {
-                    client.groupsList.remove(currentGroup);
+                if (client.isMemberOf(currentGroupId).length() > 0) {
+                    client.groupsList.remove(currentGroupId);
                 }
             }
         } else {
@@ -193,9 +229,14 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private String isMemberOf(String currentGroup) {
-        Map<String, String> groupsList = getGroupsList();
-        String groupRole = groupsList.get(currentGroup);
+    /**
+     * Check if the current client is member of the parameter group.
+     * @param currentGroupId Integer
+     * @return String The role or the client in the group or empty string
+     */
+    private String isMemberOf(Integer currentGroupId) {
+        Map<Integer, String> groupsList = getGroupsList();
+        String groupRole = groupsList.get(currentGroupId);
         if (groupRole.length() > 0) {
             return groupRole;
         }
@@ -203,21 +244,32 @@ public class ClientHandler extends Thread {
         return "";
     }
 
-    private void changeGroup(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
-        String groupName = commandTokens[1];
-        String groupRole = groupsList.get(groupName);
-        if (groupRole.length() > 0) {
-            setCurrentGroup(groupName);
-            server.broadcastMessageToGroup("User "+getUsername()+" joined the group "+groupName+"!\n", groupName);
-        } else {
-            receiveMessage("You are not yet in group "+groupName+"!");
+    private void selectGroup(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
+        GroupHandler oldGroup = getCurrentGroup();
+        String newGroupName = commandTokens[1];
 
-            String helperMsg =  "You may create such a group with the command: /create "+groupName+" !\n";
+        GroupHandler newGroup;
+        try {
+            newGroup = Server.getGroupByName(newGroupName);
+        } catch (Exception e) {
+            receiveMessage("Error! Group "+newGroupName+" not found!");
+            return;
+        }
+
+        String groupRole = groupsList.get(newGroup.getId());
+        if (groupRole.length() > 0) {
+            setCurrentGroup(newGroup);
+            server.broadcastMessageToGroup("User "+getUsername()+" left the group "+oldGroup.getName()+"!\n", oldGroup.getId());
+            server.broadcastMessageToGroup("User "+getUsername()+" joined the group "+newGroup.getName()+"!\n", newGroup.getId());
+        } else {
+            receiveMessage("You are not yet registered in group "+newGroupName+"!");
+
+            String helperMsg =  "You may create such a group with the command: /create "+newGroupName+" !\n";
             ArrayList<GroupHandler> groupsList = server.getGroupsList();
             for (GroupHandler group: groupsList) {
-                if (group.getName().equals(groupName)) {
+                if (group.getName().equals(newGroupName)) {
 
-                    helperMsg = "You may join this group using the command /join "+groupName+"!\n";
+                    helperMsg = "You may join this group using the command /join "+newGroupName+"!\n";
                     break;
                 }
             }
@@ -226,20 +278,15 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void createGroup(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
-
+    private void createGroup(OutputStream clientOutputStream, String[] commandTokens) throws Exception {
         ArrayList<GroupHandler> groupsList = server.getGroupsList();
-        String groupName = GroupHandler.validateName(clientOutputStream, commandTokens, this, groupsList);
-        String groupType = GroupHandler.validateType(clientOutputStream, commandTokens);
+        String groupName = GroupHandler.validateGroupName(clientOutputStream, commandTokens, this, groupsList);
+        String groupType = GroupHandler.validateGroupType(clientOutputStream, commandTokens);
 
-        GroupHandler newGroup = new GroupHandler(this, groupName, groupType);
+        GroupHandler newGroup = server.createGroup(this, groupName, groupType);
 
-        server.getGroupsList().add(newGroup);
-
-        setRole(Server.ROLE_SUPERADMIN);
-        setCurrentGroup(groupName);
-
-        updateRoleInCurrentGroup();
+        setCurrentGroup(newGroup);
+        updateRoleInCurrentGroup(newGroup.getId(), Server.ROLE_SUPERADMIN);
     }
 
     private void outputGroupInfo(OutputStream clientOutputStream) throws IOException {
@@ -261,15 +308,12 @@ public class ClientHandler extends Thread {
         } else {
             if (!isLoggedIn()) {
                 result = false;
-                clientOutputStream.write(("You are already logged in! If you need to change the username, use the command: '/change new_username' !\n").getBytes());
+                clientOutputStream.write(("You are already logged in! If you need to change the username, use the command: '/change <new_username>' !\n").getBytes());
             } else {
                 clientOutputStream.write("Login OK!\n".getBytes());
                 String msg = "User '" + currentUsername + "' just logged in as '" + username + "'!\n";
                 server.broadcastMessage(msg, true);
 
-                setRole(Server.ROLE_USER);
-
-                updateRoleInCurrentGroup();
                 outputGroupInfo(clientOutputStream);
             }
         }
@@ -278,10 +322,10 @@ public class ClientHandler extends Thread {
     }
 
     private boolean isLoggedIn() {
-        return getCurrentRole().equals(server.ROLE_GUEST);
+        return getCurrentRole().equals(Server.ROLE_GUEST);
     }
 
-    private boolean handleChange(String[] commandTokens) throws IOException {
+    private boolean changeUsername(String[] commandTokens) throws IOException {
         String currentUsername = getUsername();
         String error = this.validateUsername(commandTokens);
 
