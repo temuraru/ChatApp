@@ -6,28 +6,33 @@ There are some classes :
     the mainHall group has the serverBot special ClientHandler instance
 - ClientHandler - handles client
 
-### Commands:
+# Commands:
 ## Guest commands:
-- /login username
 - /help
 - /quit
-## Normal user commands:
-- /logoff
-- /user new_username
+- /login <user_name>
 - /list - list all available chat groups
-- /create <group> <type> # where type can be [public]|private|closed
-- /select <group> # set another group as the current group
-- /request <group> # request to be added to the group
-- /join <group>
+- /speak <message> - deliver message to the current group
+## Normal user commands:
+- /logoff # = /quit
+- /user <new_username>
+- /create <group> [<type>] # where type can be [public]|private|closed
+- /select <group> # set another group as the current group (if already member)
+- /request <group> # request to be added to a PRIVATE group
+- /join <group> # join a PUBLIC group
 - /leave <group>
+- /accept <group> - accept an invite sent by an admin from a CLOSED group
+- /talk <user_name> <message> - deliver <message> to client <user_name>
+- /block <user_name> - block client <user_name>
+- /unblock <user_name> - unblock client <user_name>
 ## Admin commands:
 - /groupname <new_name> # change the name of the current group
 - /grouptype <new_type> # where new_type can be [public]|private|closed
-- /add <group> <user> - add an user to a group
-- /invite <group> <user> - invite an user to a group
-- /kick <group> <user> [<reason>] - remove an user from a group
-- /promote <group> <user> - make an user admin on that group
-- /demote <group> <user> - transforms the role of an admin to normal user on that group
+- /add <user> [<group>] - add an user to a group
+- /kick <user> [<group>] [<reason>] - remove an user from a group
+- /promote <user> [<group>] - make an user admin on that group
+- /demote <user> [<group>] - transforms the role of an admin to normal user on that group
+- /invite <user> [<group>] - invite an user to a PRIVATE group
 ## SuperAdmin commands:
 - /delete <group>
 

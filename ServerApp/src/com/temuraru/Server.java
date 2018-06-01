@@ -12,9 +12,11 @@ public class Server extends Thread {
     public static final String ROLE_ADMIN = "admin";
     public static final String ROLE_SUPERADMIN = "superadmin";
     public static final String ROLE_SERVER_BOT = "serverbot";
+    public static final String ROLE_JOIN_REQUESTED = "join_requested";
 
     private final int port;
 
+    public static final String SERVER_BOT_NAME = "serverbot";
     public static final Integer SERVER_BOT_CLIENT_ID = 1;
     public static final Integer MAIN_GROUP_ID = 1;
     public static final String MAIN_GROUP_NAME = "Main";
@@ -23,6 +25,7 @@ public class Server extends Thread {
     private static ArrayList<GroupHandler> groupsList = new ArrayList<>();
     private Map<String, String> commands;
     private static GroupHandler mainGroup;
+    private ClientHandler serverBot;
 
     public Server(int port) {
         this.port = port;
@@ -33,18 +36,35 @@ public class Server extends Thread {
         return mainGroup;
     }
 
-    @Override
-    public void run() {
+    public GroupHandler createGroup(ClientHandler owner, String groupName, String groupType) throws Exception {
+        GroupHandler newGroup = new GroupHandler(owner, groupName, groupType);
+        newGroup.setId(++lastGroupId);
 
-        ClientHandler serverBot;
+        groupsList.add(newGroup);
+
+        return newGroup;
+    }
+
+    private void createServerBot() {
         try {
-            serverBot = new ClientHandler(this, SERVER_BOT_CLIENT_ID);
-            mainGroup = createGroup(serverBot, MAIN_GROUP_NAME, GroupHandler.TYPE_PUBLIC);
+            serverBot = new ClientHandler(this);
+            mainGroup = new GroupHandler(serverBot, Server.MAIN_GROUP_NAME, GroupHandler.TYPE_PUBLIC);
+            mainGroup.setId(Server.MAIN_GROUP_ID);
             groupsList.add(mainGroup);
+            serverBot.setCurrentGroup(mainGroup);
             clientsList.add(serverBot);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public ClientHandler getServerBot() throws Exception {
+        return serverBot;
+    }
+
+    @Override
+    public void run() {
+        createServerBot();
 
         Socket clientSocket;
         ClientHandler clientHandler;
@@ -57,6 +77,7 @@ public class Server extends Thread {
                 clientSocket = ss.accept();
                 clientId++;
                 clientHandler = new ClientHandler(this, clientSocket, clientId);
+                clientHandler.setCurrentGroup(Server.getMainGroup());
                 clientsList.add(clientHandler);
                 clientHandler.start();
             }
@@ -65,31 +86,12 @@ public class Server extends Thread {
         }
     }
 
-    public ClientHandler getServerBot() throws Exception {
-        for (ClientHandler client: clientsList) {
-            if (client.getRole().equals(Server.ROLE_SERVER_BOT)) {
-                return client;
-            }
-        }
-
-        throw new Exception("No client with role serverbot found!!");
-    }
-
-    public GroupHandler createGroup(ClientHandler owner, String groupName, String groupType) throws Exception {
-        GroupHandler newGroup = new GroupHandler(owner, groupName, groupType);
-        newGroup.setId(++lastGroupId);
-
-        groupsList.add(newGroup);
-
-        return newGroup;
-    }
-
     private void setCommands() {
         commands = new HashMap<String, String>();
 
-        commands.put(ROLE_GUEST, "login,help,quit");
-        commands.put(ROLE_USER, "user,list,create,select,request,join,leave,talk,groupname,grouptype");
-        commands.put(ROLE_ADMIN, "add,invite,kick,promote,demote");
+        commands.put(ROLE_GUEST, "speak,talk,login,help,info,quit,list");
+        commands.put(ROLE_USER, "user,create,select,request,join,leave,accept");
+        commands.put(ROLE_ADMIN, "groupname,grouptype,add,kick,promote,demote,invite");
         commands.put(ROLE_SUPERADMIN, "delete");
     }
 
@@ -118,16 +120,24 @@ public class Server extends Thread {
         return newCommands.split(",");
     }
 
-    public void broadcastMessageToGroup(String msg, Integer destinationGroupId) throws IOException {
+    public static void broadcastMessageToGroup(String msg, Integer destinationGroupId) throws IOException {
         for (ClientHandler client: clientsList) {
+            if (client.isServerBot()) {
+                continue;
+            }
             if (client.getCurrentGroupId().equals(destinationGroupId)) {
                 client.receiveMessage(msg);
             }
         }
     }
 
-    public void broadcastMessageToGroup(String msg, Integer destinationGroupId, String skipUsername) throws IOException {
+    public static void broadcastMessageToGroup(String msg, Integer destinationGroupId, String skipUsername) throws IOException {
         for (ClientHandler client: clientsList) {
+            if (client.isServerBot()) {
+                continue;
+            }
+//            System.out.println("skipUsername: " + skipUsername);
+//            System.out.println("client.getUsername(): " + client.getUsername());
             if (client.getUsername().equals(skipUsername)) {
                 continue;
             }
@@ -137,19 +147,57 @@ public class Server extends Thread {
         }
     }
 
+    public static void broadcastMessageToGroup(String msg, Integer destinationGroupId, String skipUsername, String[] onlyToRoles) throws IOException {
+        System.out.println("onlyToRoles:"+onlyToRoles.toString());
+        for (ClientHandler client: clientsList) {
+            if (client.isServerBot()) {
+                continue;
+            }
+            if (skipUsername.length() > 0 && client.getUsername().equals(skipUsername)) {
+                continue;
+            }
+            System.out.println("client.getUsername():"+client.getUsername());
+
+            for (String role: onlyToRoles) {
+//                System.out.println("destinationGroupId:"+destinationGroupId);
+//                System.out.println("client.getGroupsList().get(destinationGroupId):"+client.getGroupsList().get(destinationGroupId));
+                if (client.getGroupsList().get(destinationGroupId).equals(role)) {
+                    client.receiveMessage(msg);
+                }
+            }
+        }
+    }
+
     public void broadcastMessage(String msg) throws IOException {
         for (ClientHandler client: clientsList) {
+            if (client.isServerBot()) {
+                continue;
+            }
             client.receiveMessage(msg);
         }
     }
 
-    public void broadcastMessage(String msg, boolean debug) throws IOException {
+    public static void broadcastMessage(String msg, boolean debug) throws IOException {
         for (ClientHandler client: clientsList) {
+
+            System.out.println("getName(): "+client.getUsername());
+            if (client.isServerBot()) {
+                continue;
+            }
             client.receiveMessage(msg);
         }
         if (debug) {
             System.out.println(msg);
         }
+    }
+
+    public static GroupHandler getGroupByName(String groupName, boolean isMandatory) throws Exception {
+        GroupHandler foundGroup = Server.getGroupByName(groupName);
+        if (foundGroup == null && isMandatory) {
+            throw new Exception("Group not found!");
+        }
+        
+        return foundGroup;
     }
 
     public static GroupHandler getGroupByName(String groupName) throws Exception {
@@ -162,11 +210,25 @@ public class Server extends Thread {
                 }
             }
         }
-        if (foundGroup == null) {
-            throw new Exception("Group not found!");
-        }
-        
+
         return foundGroup;
+    }
+
+    public static ClientHandler getClientByName(String clientName) throws Exception {
+        ClientHandler foundClient = null;
+        if (clientsList.size() > 0) {
+            for (ClientHandler client: clientsList) {
+                if (client.getName().equals(clientName)) {
+                    foundClient = client;
+                    break;
+                }
+            }
+        }
+        if (foundClient == null) {
+            throw new Exception("Client not found!");
+        }
+
+        return foundClient;
     }
 
     public void outputGroups(OutputStream clientOutputStream) throws IOException {

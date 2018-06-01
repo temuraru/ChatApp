@@ -10,12 +10,12 @@ import java.util.Random;
 public class GroupHandler {
     public static final String TYPE_PUBLIC = "public";
     public static final String TYPE_PRIVATE = "private";
-    public static final String TYPE_CLOSED = "private";
+    public static final String TYPE_CLOSED = "closed";
     private String type;
     private String name;
     private ClientHandler owner;
-    private ArrayList<ClientHandler> adminsList = new ArrayList<>();
-    private ArrayList<ClientHandler> usersList = new ArrayList<>();
+    public ArrayList<ClientHandler> adminsList = new ArrayList<>();
+    public ArrayList<ClientHandler> usersList = new ArrayList<>();
     private int id;
 
     public GroupHandler(ClientHandler owner, String name, String type) {
@@ -26,38 +26,43 @@ public class GroupHandler {
         usersList.add(owner);
     }
 
-    public static String validateGroupName(OutputStream clientOutputStream, String[] commandTokens, ClientHandler client, ArrayList<GroupHandler> groupsList) throws IOException {
+    public static String validateGroupName(OutputStream clientOutputStream, String newGroupName, ClientHandler client, ArrayList<GroupHandler> serverGroupsList) throws IOException {
         String error;
 
-        String chosenGroupName = commandTokens[1].replaceAll("[^a-zA-Z0-9_]+", "").replaceFirst("^[^a-zA-Z]+", "");
-        if (chosenGroupName.length() > 15) {
-            chosenGroupName = chosenGroupName.substring(0,14);
-        }
+        String chosenGroupName = processGroupname(newGroupName);
         if (chosenGroupName.length() == 0) {
             error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";
         } else {
-            error = checkGroupNameEligibility(client, chosenGroupName, groupsList);
+            error = checkGroupNameEligibility(client, chosenGroupName, serverGroupsList);
         }
 
         String currentGroupName = chosenGroupName;
         if (error.length() > 0) {
             clientOutputStream.write(error.getBytes());
-            currentGroupName = generateGroupName();
+            currentGroupName = "";
         }
 
         return currentGroupName;
     }
 
-    private static String checkGroupNameEligibility(ClientHandler client, String chosenGroupName, ArrayList<GroupHandler> groupsList) {
+    private static String processGroupname(String newGroupName) {
+        String chosenGroupName = newGroupName.replaceAll("[^a-zA-Z0-9_]+", "").replaceFirst("^[^a-zA-Z]+", "");
+        if (chosenGroupName.length() > 15) {
+            chosenGroupName = chosenGroupName.substring(0,14);
+        }
+        return chosenGroupName;
+    }
+
+    private static String checkGroupNameEligibility(ClientHandler client, String chosenGroupName, ArrayList<GroupHandler> serverGroupsList) {
         GroupHandler chosenGroup;
         try {
-            chosenGroup = Server.getGroupByName(chosenGroupName);
+            chosenGroup = Server.getGroupByName(chosenGroupName, false);
         } catch (Exception e) {
             return "There is no group with the name: '"+chosenGroupName+"'! You should create it with the command: '/create "+chosenGroupName+"'!\n";
         }
 
         Map<Integer, String> clientGroupsList = client.getGroupsList();
-        if (clientGroupsList.get(chosenGroup.getId()).length() > 0) {
+        if (chosenGroup != null && clientGroupsList.get(chosenGroup.getId()).length() > 0) {
             return "You are already registered in the group '"+chosenGroupName+"'! You should use the command: '/select "+chosenGroupName+"'!\n";
         }
 
@@ -71,11 +76,11 @@ public class GroupHandler {
         forbiddenNamesList.add("guest");
 
         if (forbiddenNamesList.contains(chosenGroupName)) {
-            return "Group name "+chosenGroupName+" not allowed! a random one has been generated for you!\n";
+            return "Group name "+chosenGroupName+" not allowed!!\n";
         } else {
-            for (GroupHandler group: groupsList) {
+            for (GroupHandler group: serverGroupsList) {
                 if (group.getName().equals(chosenGroupName)) {
-                    return "You may join this group using the command /join "+chosenGroupName+"!\n";
+                    return "You may join this group using the command '/join "+chosenGroupName+"'!\n";
                 }
             }
         }
@@ -83,25 +88,27 @@ public class GroupHandler {
         return "";
     }
 
-    private static String generateGroupName() {
+    public static String generateGroupName() {
         Random randomGenerator = new Random();
         int randomInt = randomGenerator.nextInt(10000);
         return "Group" + String.valueOf(randomInt);
     }
 
-    public static String validateGroupType(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
-        String type = GroupHandler.TYPE_PUBLIC;
+    public static String validateGroupType(OutputStream clientOutputStream, String chosenType, boolean fallback) throws IOException {
         String[] availableTypes = {TYPE_PUBLIC, TYPE_PRIVATE, TYPE_CLOSED};
-        String chosenType = commandTokens[2];
-        if (Arrays.asList(availableTypes).contains(chosenType)) {
-            type = chosenType;
-        } else {
-            String error = "The third parameter (group type: "+chosenType+") is invalid! ";
-            error += "It should be one of: public, private, closed!\n";
+        if (!Arrays.asList(availableTypes).contains(chosenType)) {
+            String error = "The group type parameter ("+chosenType+") is invalid! ";
+            error += "It should be one of: "+String.join(", ", availableTypes)+"!\n";
+            if (fallback) {
+                chosenType = GroupHandler.TYPE_PUBLIC;
+                error += "Group type set to: "+GroupHandler.TYPE_PUBLIC+"!\n";
+            } else {
+                chosenType = "";
+            }
             clientOutputStream.write(error.getBytes());
         }
 
-        return type;
+        return chosenType;
     }
 
     public ClientHandler getOwner() {
