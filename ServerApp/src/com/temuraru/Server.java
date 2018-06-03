@@ -193,12 +193,17 @@ public class Server extends Thread {
         }
     }
 
-    public static GroupHandler getGroupByName(String groupName, boolean isMandatory) throws Exception {
-        GroupHandler foundGroup = Server.getGroupByName(groupName);
-        if (foundGroup == null && isMandatory) {
-            throw new GroupNotFoundException("Group not found!");
+    public static GroupHandler getGroupById(Integer groupId) {
+        GroupHandler foundGroup = null;
+        if (groupsList.size() > 0) {
+            for (GroupHandler group: groupsList) {
+                if (group.getId() == groupId) {
+                    foundGroup = group;
+                    break;
+                }
+            }
         }
-        
+
         return foundGroup;
     }
 
@@ -233,19 +238,17 @@ public class Server extends Thread {
         return foundClient;
     }
 
-    public void outputGroups(OutputStream clientOutputStream) throws IOException {
+    public String listServerGroups() {
         String groupInfo = "No groups on server!\n";
         if (groupsList.size() > 0) {
             StringBuilder sb = new StringBuilder();
             for (GroupHandler group: groupsList) {
-                sb.append((sb.length() == 0 ? "" : ", "));
-                sb.append(group.getName());
+                sb.append((sb.length() == 0 ? "" : ",") + group.getName() + " " + group.getGroupTypeSuffix());
             }
-            String groupsNames = sb.toString();
-            groupInfo = "Available groups on server: "+groupsNames+"\n";
+            groupInfo = sb.toString();
         }
 
-        clientOutputStream.write(groupInfo.getBytes());
+        return groupInfo;
     }
 
     public void outputHelp(OutputStream clientOutputStream, String role) throws IOException {

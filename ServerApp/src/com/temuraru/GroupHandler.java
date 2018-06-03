@@ -117,4 +117,20 @@ public class GroupHandler {
     public int getId() {
         return id;
     }
+
+    public String getGroupTypeSuffix() {
+        String suffix = "";
+        switch (this.getType()) {
+            case GroupHandler.TYPE_PRIVATE:
+                suffix = "[*]";
+                break;
+
+            case GroupHandler.TYPE_CLOSED:
+                suffix = "[**]";
+                break;
+
+        }
+
+        return suffix;
+    }
 }

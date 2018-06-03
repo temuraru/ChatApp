@@ -1,9 +1,6 @@
 package com.temuraru;
 
-import com.temuraru.Exceptions.DuplicateGroupException;
 import com.temuraru.Exceptions.ForbiddenNameException;
-import com.temuraru.Exceptions.GroupNotFoundException;
-import javafx.scene.Group;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
@@ -19,18 +16,17 @@ public class ClientHandler extends Thread {
     private int clientId;
     private String role;
     private String username;
-    //    private ArrayList<GroupHandler> groupsList = new ArrayList<>();
     private Map<Integer, String> groupsList = new HashMap<Integer, String>();
     private ArrayList<ClientHandler> blockedClientsList = new ArrayList<ClientHandler>();
 
 
-    public ClientHandler(Server server) throws IOException {
+    public ClientHandler(Server server) {
         this.server = server;
         this.clientId = Server.SERVER_BOT_CLIENT_ID;
         this.username = Server.SERVER_BOT_NAME;
         updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, Server.ROLE_SERVER_BOT);
     }
-    public ClientHandler(Server server, Socket clientSocket, int clientId) throws IOException {
+    public ClientHandler(Server server, Socket clientSocket, int clientId) {
         this.server = server;
         this.clientSocket = clientSocket;
         this.clientId = clientId;
@@ -42,11 +38,16 @@ public class ClientHandler extends Thread {
         groupsList.put(groupId, groupRole);
     }
 
-    public void listGroups() {
+    public String listClientsGroups() {
+        StringBuilder listing = new StringBuilder();
         // classic way, loop a Map
         for (Map.Entry<Integer, String> entry : groupsList.entrySet()) {
-            System.out.println("Key : " + entry.getKey() + " Value : " + entry.getValue());
+            String groupInfo = entry.getValue() + " [id: " + entry.getKey() + "]";
+            GroupHandler group = Server.getGroupById(entry.getKey());
+            listing.append((listing.length() == 0 ? "" : "; ") + groupInfo + " " + group.getGroupTypeSuffix());
         }
+
+        return listing.toString();
     }
 
     public String getCurrentRole() {
@@ -118,14 +119,12 @@ public class ClientHandler extends Thread {
 
                 String[] currentRoleCommands = server.getCommandsForRole(getCurrentRole());
                 if (!Arrays.asList(currentRoleCommands).contains(cmd)) {
-                    msg = "Unknown command for your group/role! Type '/help' for a list of available commands!\n";
+                    msg = "Invalid command for your group/role! Type '/help' for a list of available commands!\n";
                     clientOutputStream.write(msg.getBytes());
                 } else {
                     processCommand(cmd, commandTokens, clientOutputStream);
                 }
             }
-
-//            clientOutputStream.write(msg.getBytes());
         }
     }
 
@@ -159,7 +158,7 @@ public class ClientHandler extends Thread {
                 server.outputHelp(clientOutputStream, this.getCurrentRole());
                 break;
             case "list":
-                server.outputGroups(clientOutputStream);
+                listGroups(clientOutputStream);
                 break;
             case "speak":
                 if (commandTokens.length < 2) {
@@ -307,6 +306,17 @@ public class ClientHandler extends Thread {
                 receiveMessage("Feature "+cmd+" not implemented yet!\n");
                 break;
         }
+    }
+
+    private void listGroups(OutputStream clientOutputStream) throws IOException {
+        String serverGroups = server.listServerGroups();
+        serverGroups = "Available groups on server: "+serverGroups+"\n";
+
+        String clientGroups = listClientsGroups();
+        clientGroups = "Your groups: "+clientGroups+"\n";
+
+        String listGroups = serverGroups + clientGroups;
+        clientOutputStream.write(listGroups.getBytes());
     }
 
     private void speakToGroup(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
