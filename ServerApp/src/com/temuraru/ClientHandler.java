@@ -1,5 +1,9 @@
 package com.temuraru;
 
+import com.temuraru.Exceptions.DuplicateGroupException;
+import com.temuraru.Exceptions.ForbiddenNameException;
+import com.temuraru.Exceptions.GroupNotFoundException;
+import javafx.scene.Group;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
@@ -565,18 +569,18 @@ public class ClientHandler extends Thread {
         if (groupToJoin != null) {
             switch(groupToJoin.getType()) {
                 case GroupHandler.TYPE_PUBLIC:
-                    receiveMessage("Group type is: PUBLIC. You cannot request approval! You should use: '/join <group_name>'!");
+                    receiveMessage("Group type is: PUBLIC. You cannot request approval! You should use: '/join <group_name>'!\n");
                     break;
                 case GroupHandler.TYPE_PRIVATE:
                     groupsList.put(groupToJoin.getId(), Server.ROLE_JOIN_REQUESTED);
                     String[] adminRoles = {Server.ROLE_ADMIN, Server.ROLE_SUPERADMIN};
                     String msg = "User " + getUsername() + " requested access to group " + groupToJoin.getName() + ". You could add him/her with: '/add " + groupToJoin.getName() + " " + getUsername() + "'!\n";
                     Server.broadcastMessageToGroup(msg, groupToJoin.getId(), "", adminRoles);
-                    receiveMessage("Request has been sent! You will be added by an admin if you are eligible!");
+                    receiveMessage("Request has been sent! You will be added by an admin if you are eligible!\n");
                     break;
                 case GroupHandler.TYPE_CLOSED:
                     groupsList.put(groupToJoin.getId(), Server.ROLE_JOIN_REQUESTED);
-                    receiveMessage("Group type is CLOSED. You can only be added by an admin!");
+                    receiveMessage("Group type is CLOSED. You can only be added by an admin!\n");
                     break;
             }
         }
@@ -591,21 +595,26 @@ public class ClientHandler extends Thread {
             return;
         }
 
+        if (isMemberOf(groupToJoin.getId())) {
+            receiveMessage("You already are a member of this group!\n");
+            return;
+        }
+
         if (groupToJoin != null) {
             switch(groupToJoin.getType()) {
                 case GroupHandler.TYPE_PUBLIC:
                     groupToJoin.usersList.add(this);
                     groupsList.put(groupToJoin.getId(), Server.ROLE_USER);
                     setCurrentGroup(groupToJoin);
-                    receiveMessage("Group type is: PUBLIC. You are now a member!");
+                    receiveMessage("Group type is: PUBLIC. You are now a member!\n");
                     break;
                 case GroupHandler.TYPE_PRIVATE:
                     groupsList.put(groupToJoin.getId(), Server.ROLE_JOIN_REQUESTED);
-                    receiveMessage("Group type is: PRIVATE. You have to request approval first: '/request <group_name>'!");
+                    receiveMessage("Group type is: PRIVATE. You have to request approval first: '/request <group_name>'!\n");
                     break;
                 case GroupHandler.TYPE_CLOSED:
                     groupsList.put(groupToJoin.getId(), Server.ROLE_JOIN_REQUESTED);
-                    receiveMessage("Group type is CLOSED. You have to receive an invite from an admin in order to join!");
+                    receiveMessage("Group type is CLOSED. You have to receive an invite from an admin in order to join!\n");
                     break;
             }
         }
@@ -641,19 +650,38 @@ public class ClientHandler extends Thread {
     }
 
     private void changeGroupName(OutputStream clientOutputStream, String[] commandTokens) throws IOException {
-        String newGroupName = GroupHandler.validateGroupName(clientOutputStream, commandTokens[1], this, Server.getGroupsList());
-        if (newGroupName.length() == 0) {
+//        String newGroupName = GroupHandler.validateGroupName(clientOutputStream, commandTokens[1], this, Server.getGroupsList());
+        String error = "";
+        String oldGroupName = currentGroup.getName();
+        String chosenGroupName = commandTokens[1];
+
+        // validate group name
+        String processedGroupName = GroupHandler.processGroupname(chosenGroupName);
+        if (processedGroupName.length() == 0) {
+            processedGroupName = GroupHandler.generateGroupName();
+            error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";
+            error += "A random name has been generated for you: "+processedGroupName;
+            receiveMessage(error);
+        }
+        try {
+            GroupHandler.checkGroupNameEligibility(processedGroupName);
+        } catch (ForbiddenNameException e) {
+            error += "Group name "+chosenGroupName+" not allowed!!\n";
+            receiveMessage(error);
+        }
+        if (oldGroupName.equals(processedGroupName))  {
+            error += "The new group name is the same with the current one!!";
+        }
+        if (error.length() > 0 ) {
+            clientOutputStream.write(error.getBytes());
             return;
         }
-        String oldGroupName = currentGroup.getName();
-        if (oldGroupName.equals(newGroupName))  {
-            receiveMessage("The new group name is the same with the current one!!");
-        }
 
-        // proceed!
+        // the name is valid, proceed!
         if (isAdminInGroup(getCurrentGroupId())) {
-            currentGroup.setName(newGroupName);
-            Server.broadcastMessageToGroup("User "+getUsername()+" changed the group name from "+oldGroupName+" to "+currentGroup.getName()+"!\n", getCurrentGroupId());
+            currentGroup.setName(processedGroupName);
+            String confirmationMsg = "User " + getUsername() + " changed the group name from " + oldGroupName + " to " + currentGroup.getName() + "!\n";
+            Server.broadcastMessageToGroup(confirmationMsg, getCurrentGroupId());
         } else {
             receiveMessage("You are not allowed to make changes to the group "+getCurrentGroup()+" (since you're not an admin)!");
         }
@@ -680,19 +708,23 @@ public class ClientHandler extends Thread {
     }
 
     private void deleteGroup() throws IOException {
-        if (groupsList.get(currentGroup.getId()).equals(Server.ROLE_SUPERADMIN)) {
-            Server.broadcastMessageToGroup("This group is being deleted! Sorry!\n", getCurrentGroupId());
+        GroupHandler oldGroup = currentGroup;
+        if (groupsList.get(oldGroup.getId()).equals(Server.ROLE_SUPERADMIN)) {
+            Server.broadcastMessageToGroup("This group is being deleted! Sorry!\n", oldGroup.getId());
 
             ArrayList<ClientHandler> clientsList = Server.getClientsList();
             for (ClientHandler client: clientsList) {
-                if (client.isMemberOf(currentGroup.getId())) {
-                    if (client.getCurrentGroupId() == currentGroup.getId()) {
+                if (client.isMemberOf(oldGroup.getId())) {
+                    if (client.getCurrentGroupId() == oldGroup.getId()) {
+                        client.setCurrentGroup(Server.getMainGroup());
                         client.updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, client.groupsList.get(Server.MAIN_GROUP_ID));
                     }
-                    client.groupsList.remove(currentGroup.getId());
+                    client.groupsList.remove(oldGroup.getId());
                 }
             }
-            Server.getGroupsList().remove(currentGroup);
+            Server.getGroupsList().remove(oldGroup);
+            // select th emain group as the current group for the current client
+            setCurrentGroup(Server.getMainGroup());
         } else {
             receiveMessage("You are not allowed to delete this group since you didn't create it!\n");
         }
@@ -742,19 +774,69 @@ public class ClientHandler extends Thread {
 
     private void createGroup(OutputStream clientOutputStream, String[] commandTokens) throws Exception {
         ArrayList<GroupHandler> serverGroupsList = Server.getGroupsList();
-        String groupName = GroupHandler.validateGroupName(clientOutputStream, commandTokens[1], this, serverGroupsList);
-        if (groupName.length() == 0) {
-            groupName = GroupHandler.generateGroupName();
-            receiveMessage("A random name has been generated for you: "+groupName);
+//        String groupName = GroupHandler.validateGroupName(clientOutputStream, commandTokens[1], this, serverGroupsList);
+        String error = "";
+        GroupHandler chosenGroup;
+        String chosenGroupName = commandTokens[1];
+
+        // validate group name
+        String processedGroupName = GroupHandler.processGroupname(chosenGroupName);
+        if (processedGroupName.length() == 0) {
+            processedGroupName = GroupHandler.generateGroupName();
+            error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";
+            error += "A random name has been generated for you: "+processedGroupName;
+            receiveMessage(error);
         }
-        String chosenType = commandTokens.length == 3 ? commandTokens[2] : GroupHandler.TYPE_PUBLIC;
-        String groupType = GroupHandler.validateGroupType(clientOutputStream, chosenType, true);
+        try {
+            GroupHandler.checkGroupNameEligibility(processedGroupName);
+        } catch (ForbiddenNameException e) {
+            error += "Group name "+chosenGroupName+" not allowed!!\n";
+            receiveMessage(error);
+        }
+        if (error.length() > 0 ) {
+            clientOutputStream.write(error.getBytes());
+            return;
+        }
 
-        GroupHandler newGroup = server.createGroup(this, groupName, groupType);
+        // the name is valid, proceed!
+        chosenGroup = Server.getGroupByName(processedGroupName);
+        if (chosenGroup != null) {
+            error = "The group: '"+processedGroupName+"' already exists!\n";
+            if (this.isNotMemberOf(chosenGroup.getId())) {
+                error += "You may join this group using the command '/join "+processedGroupName+"'!\n";
+            } else {
+                error += " You are already registered in the group '"+processedGroupName+"'!\n";
+                if  (!currentGroup.getName().equals(processedGroupName)) {
+                    error += " You should switch to it by using the command: '/select "+processedGroupName+"'!\n";
+                }
+            }
+            clientOutputStream.write(error.getBytes());
+        } else {
+            String chosenType = commandTokens.length == 3 ? commandTokens[2] : GroupHandler.TYPE_PUBLIC;
+            String groupType = GroupHandler.validateGroupType(clientOutputStream, chosenType, true);
 
-        setCurrentGroup(newGroup);
-        updateRoleInCurrentGroup(newGroup.getId(), Server.ROLE_SUPERADMIN);
-        clientOutputStream.write(("Group "+newGroup.getName()+" has been created and your role is SUPERADMIN!\n").getBytes());
+            GroupHandler newGroup = server.createGroup(this, processedGroupName, groupType);
+
+            setCurrentGroup(newGroup);
+            updateRoleInCurrentGroup(newGroup.getId(), Server.ROLE_SUPERADMIN);
+
+            String confirmationMsg = "Group " + newGroup.getName() + " has been created and your role is SUPERADMIN!\n";
+            clientOutputStream.write(confirmationMsg.getBytes());
+            Server.broadcastMessageToGroup("Group " + newGroup.getName() + " has been created!\n", getCurrentGroupId(), getUsername());
+
+        }
+
+//        try {
+//            error += " You should create it with the command: '/create "+processedGroupName+"'!\n";
+//        } catch (GroupNotFoundException e) {
+//            error = "There is no group with the name: '"+processedGroupName+"'! You should create it with the command: '/create "+processedGroupName+"'!\n";
+//        } catch (DuplicateGroupException e) {
+//            error = "The group: '"+processedGroupName+"' already exists!\n";
+//            if (this.isNotMemberOf(chosenGroup.getId())) {
+//                error += " You should create it with the command: '/create "+processedGroupName+"'!\n";
+//            }
+//        }
+
     }
 
     private void outputGroupInfo(OutputStream clientOutputStream) throws IOException {
@@ -762,7 +844,8 @@ public class ClientHandler extends Thread {
 
         String separator = "================================\n";
         String groupInfo = separator;
-        groupInfo +="Your current group is: "+currentGroup.getName()+" and your current role is: "+this.getCurrentRole().toUpperCase()+"!!!\n";
+        groupInfo +="Your name is: "+getUsername();
+        groupInfo +=", your current group is: "+currentGroup.getName()+" and your current role is: "+this.getCurrentRole().toUpperCase()+"!!!\n";
         groupInfo += "Your commands are: /"+String.join(", /", commandsForRole)+"\n";
         groupInfo += separator;
         clientOutputStream.write(groupInfo.getBytes());
@@ -889,19 +972,25 @@ public class ClientHandler extends Thread {
     public boolean isGuest() {
         return getCurrentRole().equals(Server.ROLE_GUEST);
     }
-    public boolean isSuperAdmin() {
-        return getCurrentRole().equals(Server.ROLE_SUPERADMIN);
+    public boolean isUserInGroup() {
+        return getCurrentRole().equals(Server.ROLE_USER);
     }
-    public boolean isServerBot() {
-        System.out.println("getName(): "+getName());
-        return getUsername().equals(Server.SERVER_BOT_NAME);
-    }
-
     public boolean isAdminInGroup(Integer groupId) {
         String currentRole = getGroupsList().get(groupId);
         String[] adminRoles = new String[]{Server.ROLE_ADMIN, Server.ROLE_SUPERADMIN};
 
         return Arrays.asList(adminRoles).contains(currentRole);
+    }
+    public boolean isSimpleAdminInGroup() {
+        return getCurrentRole().equals(Server.ROLE_ADMIN);
+    }
+    public boolean isSuperAdmin() {
+        return getCurrentRole().equals(Server.ROLE_SUPERADMIN);
+    }
+
+    public boolean isServerBot() {
+        System.out.println("getName(): "+getName());
+        return getUsername().equals(Server.SERVER_BOT_NAME);
     }
 
     /**
@@ -921,6 +1010,10 @@ public class ClientHandler extends Thread {
 
     public boolean isMemberOf(Integer groupId) {
         return getMembershipOfGroup(groupId).length() > 0;
+    }
+
+    public boolean isNotMemberOf(Integer groupId) {
+        return !isMemberOf(groupId);
     }
 
 }

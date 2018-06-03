@@ -1,5 +1,7 @@
 package com.temuraru;
 
+import com.temuraru.Exceptions.ForbiddenNameException;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -26,45 +28,16 @@ public class GroupHandler {
         usersList.add(owner);
     }
 
-    public static String validateGroupName(OutputStream clientOutputStream, String newGroupName, ClientHandler client, ArrayList<GroupHandler> serverGroupsList) throws IOException {
-        String error;
-
-        String chosenGroupName = processGroupname(newGroupName);
-        if (chosenGroupName.length() == 0) {
-            error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";
-        } else {
-            error = checkGroupNameEligibility(client, chosenGroupName, serverGroupsList);
-        }
-
-        String currentGroupName = chosenGroupName;
-        if (error.length() > 0) {
-            clientOutputStream.write(error.getBytes());
-            currentGroupName = "";
-        }
-
-        return currentGroupName;
-    }
-
-    private static String processGroupname(String newGroupName) {
+    public static String processGroupname(String newGroupName) {
         String chosenGroupName = newGroupName.replaceAll("[^a-zA-Z0-9_]+", "").replaceFirst("^[^a-zA-Z]+", "");
         if (chosenGroupName.length() > 15) {
             chosenGroupName = chosenGroupName.substring(0,14);
         }
+
         return chosenGroupName;
     }
 
-    private static String checkGroupNameEligibility(ClientHandler client, String chosenGroupName, ArrayList<GroupHandler> serverGroupsList) {
-        GroupHandler chosenGroup;
-        try {
-            chosenGroup = Server.getGroupByName(chosenGroupName, false);
-        } catch (Exception e) {
-            return "There is no group with the name: '"+chosenGroupName+"'! You should create it with the command: '/create "+chosenGroupName+"'!\n";
-        }
-
-        Map<Integer, String> clientGroupsList = client.getGroupsList();
-        if (chosenGroup != null && clientGroupsList.get(chosenGroup.getId()).length() > 0) {
-            return "You are already registered in the group '"+chosenGroupName+"'! You should use the command: '/select "+chosenGroupName+"'!\n";
-        }
+    public static boolean checkGroupNameEligibility(String chosenGroupName) throws ForbiddenNameException {
 
         ArrayList<String> forbiddenNamesList = new ArrayList<String>();
         forbiddenNamesList.add("all");
@@ -76,16 +49,10 @@ public class GroupHandler {
         forbiddenNamesList.add("guest");
 
         if (forbiddenNamesList.contains(chosenGroupName)) {
-            return "Group name "+chosenGroupName+" not allowed!!\n";
-        } else {
-            for (GroupHandler group: serverGroupsList) {
-                if (group.getName().equals(chosenGroupName)) {
-                    return "You may join this group using the command '/join "+chosenGroupName+"'!\n";
-                }
-            }
+            throw new ForbiddenNameException();
         }
 
-        return "";
+        return true;
     }
 
     public static String generateGroupName() {

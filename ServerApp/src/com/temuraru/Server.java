@@ -1,5 +1,7 @@
 package com.temuraru;
 
+import com.temuraru.Exceptions.GroupNotFoundException;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
@@ -194,13 +196,13 @@ public class Server extends Thread {
     public static GroupHandler getGroupByName(String groupName, boolean isMandatory) throws Exception {
         GroupHandler foundGroup = Server.getGroupByName(groupName);
         if (foundGroup == null && isMandatory) {
-            throw new Exception("Group not found!");
+            throw new GroupNotFoundException("Group not found!");
         }
         
         return foundGroup;
     }
 
-    public static GroupHandler getGroupByName(String groupName) throws Exception {
+    public static GroupHandler getGroupByName(String groupName) {
         GroupHandler foundGroup = null;
         if (groupsList.size() > 0) {
             for (GroupHandler group: groupsList) {
@@ -218,7 +220,7 @@ public class Server extends Thread {
         ClientHandler foundClient = null;
         if (clientsList.size() > 0) {
             for (ClientHandler client: clientsList) {
-                if (client.getName().equals(clientName)) {
+                if (client.getUsername().equals(clientName)) {
                     foundClient = client;
                     break;
                 }
