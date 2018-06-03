@@ -604,7 +604,7 @@ public class CommandProcessor {
         String chosenGroupName = commandTokens[1];
 
         // validate group name
-        String processedGroupName = GroupHandler.processGroupname(chosenGroupName);
+        String processedGroupName = GroupHandler.processGroupName(chosenGroupName);
         if (processedGroupName.length() == 0) {
             processedGroupName = GroupHandler.generateGroupName();
             error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";
@@ -743,7 +743,7 @@ public class CommandProcessor {
         String chosenGroupName = commandTokens[1];
 
         // validate group name
-        String processedGroupName = GroupHandler.processGroupname(chosenGroupName);
+        String processedGroupName = GroupHandler.processGroupName(chosenGroupName);
         if (processedGroupName.length() == 0) {
             processedGroupName = GroupHandler.generateGroupName();
             error = "Group name contains only invalid characters! Should contain only letters, _ and/or numbers and start with a letter!\n!";

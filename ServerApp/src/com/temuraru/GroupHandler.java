@@ -17,11 +17,6 @@ public class GroupHandler {
     private String name;
     private ClientHandler owner;
     public ArrayList<ClientHandler> adminsList = new ArrayList<>();
-
-    public ArrayList<ClientHandler> getUsersList() {
-        return usersList;
-    }
-
     public ArrayList<ClientHandler> usersList = new ArrayList<>();
     private int id;
 
@@ -29,11 +24,11 @@ public class GroupHandler {
         this.owner = owner;
         this.name = name;
         this.type = type;
-        adminsList.add(owner);
-        usersList.add(owner);
+        this.getAdminsList().add(owner);
+        this.getUsersList().add(owner);
     }
 
-    public static String processGroupname(String newGroupName) {
+    public static String processGroupName(String newGroupName) {
         String chosenGroupName = newGroupName.replaceAll("[^a-zA-Z0-9_]+", "").replaceFirst("^[^a-zA-Z]+", "");
         if (chosenGroupName.length() > 15) {
             chosenGroupName = chosenGroupName.substring(0,14);
@@ -42,9 +37,9 @@ public class GroupHandler {
         return chosenGroupName;
     }
 
-    public static boolean checkGroupNameEligibility(String chosenGroupName) throws ForbiddenNameException {
-
+    public static void checkGroupNameEligibility(String chosenGroupName) throws ForbiddenNameException {
         ArrayList<String> forbiddenNamesList = new ArrayList<String>();
+
         forbiddenNamesList.add("all");
         forbiddenNamesList.add("user");
         forbiddenNamesList.add("group");
@@ -56,18 +51,17 @@ public class GroupHandler {
         if (forbiddenNamesList.contains(chosenGroupName)) {
             throw new ForbiddenNameException();
         }
-
-        return true;
     }
 
     public static String generateGroupName() {
         Random randomGenerator = new Random();
         int randomInt = randomGenerator.nextInt(10000);
+
         return "Group" + String.valueOf(randomInt);
     }
 
     public static String validateGroupType(OutputStream clientOutputStream, String chosenType, boolean fallback) throws IOException {
-        String[] availableTypes = {TYPE_PUBLIC, TYPE_PRIVATE, TYPE_CLOSED};
+        String[] availableTypes = {GroupHandler.TYPE_PUBLIC, GroupHandler.TYPE_PRIVATE, GroupHandler.TYPE_CLOSED};
         if (!Arrays.asList(availableTypes).contains(chosenType)) {
             String error = "The group type parameter ("+chosenType+") is invalid! ";
             error += "It should be one of: "+String.join(", ", availableTypes)+"!\n";
@@ -95,8 +89,8 @@ public class GroupHandler {
         return adminsList;
     }
 
-    public void setAdminsList(ArrayList<ClientHandler> adminsList) {
-        this.adminsList = adminsList;
+    public ArrayList<ClientHandler> getUsersList() {
+        return usersList;
     }
 
     public String getName() {
@@ -115,12 +109,12 @@ public class GroupHandler {
         this.type = type;
     }
 
-    public void setId(int lastGroupId) {
-        this.id = lastGroupId;
-    }
-
     public int getId() {
         return id;
+    }
+
+    public void setId(int lastGroupId) {
+        this.id = lastGroupId;
     }
 
     public String getGroupTypeSuffix() {
