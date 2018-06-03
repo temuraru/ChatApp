@@ -16,22 +16,20 @@ public class Server extends Thread {
     public static final String ROLE_SERVER_BOT = "serverbot";
     public static final String ROLE_JOIN_REQUESTED = "join_requested";
 
-    private final int port;
-
     public static final String SERVER_BOT_NAME = "serverbot";
     public static final Integer SERVER_BOT_CLIENT_ID = 1;
     public static final Integer MAIN_GROUP_ID = 1;
     public static final String MAIN_GROUP_NAME = "Main";
+
+    private final int port;
     private int lastGroupId = MAIN_GROUP_ID;
     private static ArrayList<ClientHandler> clientsList = new ArrayList<>();
     private static ArrayList<GroupHandler> groupsList = new ArrayList<>();
-    private Map<String, String> commands;
     private static GroupHandler mainGroup;
     private ClientHandler serverBot;
 
     public Server(int port) {
         this.port = port;
-        setCommands();
     }
 
     public static GroupHandler getMainGroup() {
@@ -88,38 +86,12 @@ public class Server extends Thread {
         }
     }
 
-    private void setCommands() {
-        commands = new HashMap<String, String>();
-
-        commands.put(ROLE_GUEST, "speak,talk,login,help,info,quit,list");
-        commands.put(ROLE_USER, "user,create,select,request,join,leave,accept");
-        commands.put(ROLE_ADMIN, "groupname,grouptype,add,kick,promote,demote,invite");
-        commands.put(ROLE_SUPERADMIN, "delete");
-    }
-
     public static ArrayList<ClientHandler> getClientsList() {
         return clientsList;
     }
 
     public static ArrayList<GroupHandler> getGroupsList() {
         return groupsList;
-    }
-
-    public String[] getCommandsForRole(String currentRole) {
-        String[] order = {ROLE_GUEST, ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN};
-
-        StringBuilder sb = new StringBuilder();
-        for (String role:order) {
-            String roleCommands = commands.get(role);
-            sb.append((sb.length() > 0 ? "," : ""));
-            sb.append(roleCommands);
-            if (role.equals(currentRole)) {
-                break;
-            }
-        }
-        String newCommands = sb.toString();
-
-        return newCommands.split(",");
     }
 
     public static void broadcastMessageToGroup(String msg, Integer destinationGroupId) throws IOException {
@@ -249,12 +221,6 @@ public class Server extends Thread {
         }
 
         return groupInfo;
-    }
-
-    public void outputHelp(OutputStream clientOutputStream, String role) throws IOException {
-        String[] commandsForRole = this.getCommandsForRole(role);
-        String groupInfo = "Available commands for role <"+role+">: /"+String.join(", /", commandsForRole)+"\n";
-        clientOutputStream.write(groupInfo.getBytes());
     }
 
 }

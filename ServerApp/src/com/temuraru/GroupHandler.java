@@ -17,6 +17,11 @@ public class GroupHandler {
     private String name;
     private ClientHandler owner;
     public ArrayList<ClientHandler> adminsList = new ArrayList<>();
+
+    public ArrayList<ClientHandler> getUsersList() {
+        return usersList;
+    }
+
     public ArrayList<ClientHandler> usersList = new ArrayList<>();
     private int id;
 
