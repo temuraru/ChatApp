@@ -32,36 +32,6 @@ public class Server extends Thread {
         this.port = port;
     }
 
-    public static GroupHandler getMainGroup() {
-        return mainGroup;
-    }
-
-    public GroupHandler createGroup(ClientHandler owner, String groupName, String groupType) throws Exception {
-        GroupHandler newGroup = new GroupHandler(owner, groupName, groupType);
-        newGroup.setId(++lastGroupId);
-
-        groupsList.add(newGroup);
-
-        return newGroup;
-    }
-
-    private void createServerBot() {
-        try {
-            serverBot = new ClientHandler(this);
-            mainGroup = new GroupHandler(serverBot, Server.MAIN_GROUP_NAME, GroupHandler.TYPE_PUBLIC);
-            mainGroup.setId(Server.MAIN_GROUP_ID);
-            groupsList.add(mainGroup);
-            serverBot.setCurrentGroup(mainGroup);
-            clientsList.add(serverBot);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public ClientHandler getServerBot() throws Exception {
-        return serverBot;
-    }
-
     @Override
     public void run() {
         createServerBot();
@@ -86,6 +56,14 @@ public class Server extends Thread {
         }
     }
 
+    public static GroupHandler getMainGroup() {
+        return mainGroup;
+    }
+
+    public ClientHandler getServerBot() {
+        return serverBot;
+    }
+
     public static ArrayList<ClientHandler> getClientsList() {
         return clientsList;
     }
@@ -94,8 +72,30 @@ public class Server extends Thread {
         return groupsList;
     }
 
+    public GroupHandler createGroup(ClientHandler owner, String groupName, String groupType) {
+        GroupHandler newGroup = new GroupHandler(owner, groupName, groupType);
+        newGroup.setId(++lastGroupId);
+
+        Server.getGroupsList().add(newGroup);
+
+        return newGroup;
+    }
+
+    private void createServerBot() {
+        try {
+            serverBot = new ClientHandler(this);
+            mainGroup = new GroupHandler(serverBot, Server.MAIN_GROUP_NAME, GroupHandler.TYPE_PUBLIC);
+            mainGroup.setId(Server.MAIN_GROUP_ID);
+            Server.getGroupsList().add(mainGroup);
+            serverBot.setCurrentGroup(mainGroup);
+            Server.getClientsList().add(serverBot);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void broadcastMessageToGroup(String msg, Integer destinationGroupId) throws IOException {
-        for (ClientHandler client: clientsList) {
+        for (ClientHandler client: Server.getClientsList()) {
             if (client.isServerBot()) {
                 continue;
             }
@@ -106,12 +106,11 @@ public class Server extends Thread {
     }
 
     public static void broadcastMessageToGroup(String msg, Integer destinationGroupId, String skipUsername) throws IOException {
-        for (ClientHandler client: clientsList) {
+        for (ClientHandler client: Server.getClientsList()) {
             if (client.isServerBot()) {
                 continue;
             }
-//            System.out.println("skipUsername: " + skipUsername);
-//            System.out.println("client.getUsername(): " + client.getUsername());
+
             if (client.getUsername().equals(skipUsername)) {
                 continue;
             }
@@ -122,19 +121,15 @@ public class Server extends Thread {
     }
 
     public static void broadcastMessageToGroup(String msg, Integer destinationGroupId, String skipUsername, String[] onlyToRoles) throws IOException {
-        System.out.println("onlyToRoles:"+onlyToRoles.toString());
-        for (ClientHandler client: clientsList) {
+        for (ClientHandler client: Server.getClientsList()) {
             if (client.isServerBot()) {
                 continue;
             }
             if (skipUsername.length() > 0 && client.getUsername().equals(skipUsername)) {
                 continue;
             }
-            System.out.println("client.getUsername():"+client.getUsername());
 
             for (String role: onlyToRoles) {
-//                System.out.println("destinationGroupId:"+destinationGroupId);
-//                System.out.println("client.getGroupsList().get(destinationGroupId):"+client.getGroupsList().get(destinationGroupId));
                 if (client.getGroupsList().get(destinationGroupId).equals(role)) {
                     client.receiveMessage(msg);
                 }
@@ -143,7 +138,7 @@ public class Server extends Thread {
     }
 
     public void broadcastMessage(String msg) throws IOException {
-        for (ClientHandler client: clientsList) {
+        for (ClientHandler client: Server.getClientsList()) {
             if (client.isServerBot()) {
                 continue;
             }
@@ -152,9 +147,7 @@ public class Server extends Thread {
     }
 
     public static void broadcastMessage(String msg, boolean debug) throws IOException {
-        for (ClientHandler client: clientsList) {
-
-            System.out.println("getName(): "+client.getUsername());
+        for (ClientHandler client: Server.getClientsList()) {
             if (client.isServerBot()) {
                 continue;
             }
@@ -167,8 +160,8 @@ public class Server extends Thread {
 
     public static GroupHandler getGroupById(Integer groupId) {
         GroupHandler foundGroup = null;
-        if (groupsList.size() > 0) {
-            for (GroupHandler group: groupsList) {
+        if (Server.getGroupsList().size() > 0) {
+            for (GroupHandler group: Server.getGroupsList()) {
                 if (group.getId() == groupId) {
                     foundGroup = group;
                     break;
@@ -181,8 +174,8 @@ public class Server extends Thread {
 
     public static GroupHandler getGroupByName(String groupName) {
         GroupHandler foundGroup = null;
-        if (groupsList.size() > 0) {
-            for (GroupHandler group: groupsList) {
+        if (Server.getGroupsList().size() > 0) {
+            for (GroupHandler group: Server.getGroupsList()) {
                 if (group.getName().equals(groupName)) {
                     foundGroup = group;
                     break;
@@ -195,8 +188,8 @@ public class Server extends Thread {
 
     public static ClientHandler getClientByName(String clientName) throws Exception {
         ClientHandler foundClient = null;
-        if (clientsList.size() > 0) {
-            for (ClientHandler client: clientsList) {
+        if (Server.getClientsList().size() > 0) {
+            for (ClientHandler client: Server.getClientsList()) {
                 if (client.getUsername().equals(clientName)) {
                     foundClient = client;
                     break;
@@ -212,9 +205,9 @@ public class Server extends Thread {
 
     public String listServerGroups() {
         String groupInfo = "No groups on server!\n";
-        if (groupsList.size() > 0) {
+        if (Server.getGroupsList().size() > 0) {
             StringBuilder sb = new StringBuilder();
-            for (GroupHandler group: groupsList) {
+            for (GroupHandler group: Server.getGroupsList()) {
                 sb.append((sb.length() == 0 ? "" : ",") + group.getName() + " " + group.getGroupTypeSuffix());
             }
             groupInfo = sb.toString();
@@ -222,5 +215,4 @@ public class Server extends Thread {
 
         return groupInfo;
     }
-
 }

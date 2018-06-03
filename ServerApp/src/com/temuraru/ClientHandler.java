@@ -8,17 +8,13 @@ import java.util.*;
 
 public class ClientHandler extends Thread {
 
+    private int clientId;
+    private Server server;
+    private String username;
+    private Socket clientSocket;
     private Integer currentGroupId;
     private GroupHandler currentGroup;
-    private Server server;
-
-    OutputStream clientOutputStream;
-
-    private Socket clientSocket;
-
-    private int clientId;
-    private String role;
-    private String username;
+    private OutputStream clientOutputStream;
     private Map<Integer, String> groupsList = new HashMap<Integer, String>();
     private ArrayList<ClientHandler> blockedClientsList = new ArrayList<ClientHandler>();
     private CommandProcessor processor;
@@ -39,20 +35,12 @@ public class ClientHandler extends Thread {
         this.processor = new CommandProcessor(this, server);
     }
 
-    public void updateRoleInCurrentGroup(Integer groupId, String groupRole) {
-        groupsList.put(groupId, groupRole);
-    }
-
     public int getClientId() {
         return clientId;
     }
 
     public OutputStream getClientOutputStream() {
         return clientOutputStream;
-    }
-
-    public void setClientOutputStream(OutputStream clientOutputStream) {
-        this.clientOutputStream = clientOutputStream;
     }
 
     public Socket getClientSocket() {
@@ -76,24 +64,41 @@ public class ClientHandler extends Thread {
         setCurrentGroupId(newGroup.getId());
     }
 
-    public Integer getCurrentGroupId() {
-        return currentGroupId;
-    }
-
     public void setCurrentGroupId(Integer currentGroupId) {
         this.currentGroupId = currentGroupId;
+    }
+
+    public Integer getCurrentGroupId() {
+        return currentGroupId;
     }
 
     public Map<Integer, String> getGroupsList() {
         return groupsList;
     }
 
+    public String getUsername() {
+        return username;
+    }
 
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public ArrayList<ClientHandler> getBlockedClientsList() {
+        return blockedClientsList;
+    }
+
+    public void updateRoleInCurrentGroup(Integer groupId, String groupRole) {
+        this.getGroupsList().put(groupId, groupRole);
+    }
+
+    public void setClientOutputStream(OutputStream clientOutputStream) {
+        this.clientOutputStream = clientOutputStream;
+    }
 
     @Override
     public void run() {
         try {
-            welcome();
             handleClientSocket();
         } catch (Exception e) {
             e.printStackTrace();
@@ -101,6 +106,8 @@ public class ClientHandler extends Thread {
     }
 
     private void handleClientSocket() throws Exception {
+        welcome();
+
         this.setClientOutputStream(clientSocket.getOutputStream());
         InputStream clientInputStream = clientSocket.getInputStream();
 
@@ -134,7 +141,7 @@ public class ClientHandler extends Thread {
     public String listClientsGroups() {
         StringBuilder listing = new StringBuilder();
         // classic way, loop a Map
-        for (Map.Entry<Integer, String> entry : groupsList.entrySet()) {
+        for (Map.Entry<Integer, String> entry : this.getGroupsList().entrySet()) {
             GroupHandler group = Server.getGroupById(entry.getKey());
             String groupInfo = group.getName() + " [id: " + entry.getKey() + "] - role: " + entry.getValue();
             listing.append((listing.length() == 0 ? "" : "; ") + groupInfo + " " + group.getGroupTypeSuffix());
@@ -188,7 +195,7 @@ public class ClientHandler extends Thread {
 
     public void outputCommandsInfo() throws IOException {
         String[] commandsForRole = this.getRoleCommands(this.getCurrentRole());
-        String info = "Available commands for role <"+role+">: /"+String.join(", /", commandsForRole)+"\n";
+        String info = "Available commands for role <"+this.getCurrentRole().toUpperCase()+">: /"+String.join(", /", commandsForRole)+"\n";
         this.getClientOutputStream().write(info.getBytes());
     }
 
@@ -198,7 +205,7 @@ public class ClientHandler extends Thread {
         String separator = "================================\n";
         String groupInfo = separator;
         groupInfo +="Your name is: "+getUsername();
-        groupInfo +=", your current group is: "+currentGroup.getName()+" and your current role is: "+this.getCurrentRole().toUpperCase()+"!!!\n";
+        groupInfo +=", your current group is: "+this.getCurrentGroup().getName()+" and your current role is: "+this.getCurrentRole().toUpperCase()+"!!!\n";
         groupInfo += "Your commands are: /"+String.join(", /", commandsForRole)+"\n";
         groupInfo += separator;
 
@@ -207,7 +214,7 @@ public class ClientHandler extends Thread {
 
     public void welcome() throws IOException {
         String username = this.getUsername();
-        System.out.println("Client: '"+username+"' - Accepted connection: "+username+": " + clientSocket);
+        System.out.println("Client: '"+username+"' - Accepted connection: "+username+": " + this.getClientSocket());
 
         this.receiveMessage("Welcome, '"+username+"!\n Please login with your own username! (letters, digits and '_', starting only with a letter, max 15 characters)\n");
         this.receiveMessage("Example: /login my_own_username \n");
@@ -217,32 +224,15 @@ public class ClientHandler extends Thread {
         String username = this.getUsername();
         this.receiveMessage("Goodbye, '"+ username +"' !\n");
 
-        this.clientSocket.close();
+        this.getClientSocket().close();
 
-        System.out.println("Client: '"+ username +"' - Closed connection: " + this.clientSocket);
+        System.out.println("Client: '"+ username +"' - Closed connection: " + this.getClientSocket());
     }
 
     public void receiveMessage(String msg) throws IOException {
-        OutputStream clientOutputStream = clientSocket.getOutputStream();
+        OutputStream clientOutputStream = this.getClientSocket().getOutputStream();
         clientOutputStream.write(msg.getBytes());
     }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
 
     public boolean isLoggedIn() {
         return !isGuest();
@@ -268,7 +258,7 @@ public class ClientHandler extends Thread {
 
     public boolean isServerBot() {
         System.out.println("getName(): "+getName());
-        return getUsername().equals(Server.SERVER_BOT_NAME);
+        return this.getUsername().equals(Server.SERVER_BOT_NAME);
     }
 
     /**
@@ -294,7 +284,4 @@ public class ClientHandler extends Thread {
         return !isMemberOf(groupId);
     }
 
-    public ArrayList<ClientHandler> getBlockedClientsList() {
-        return blockedClientsList;
-    }
 }
