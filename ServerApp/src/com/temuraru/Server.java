@@ -1,9 +1,6 @@
 package com.temuraru;
 
-import com.temuraru.Exceptions.GroupNotFoundException;
-
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -27,6 +24,7 @@ public class Server extends Thread {
     private static ArrayList<GroupHandler> groupsList = new ArrayList<>();
     private static GroupHandler mainGroup;
     private ClientHandler serverBot;
+    private int clientId;
 
     public Server(int port) {
         this.port = port;
@@ -35,18 +33,18 @@ public class Server extends Thread {
     @Override
     public void run() {
         createServerBot();
+        clientId = 0;
 
         Socket clientSocket;
         ClientHandler clientHandler;
-        int clientId = 0;
         try {
             ServerSocket ss = new ServerSocket(port);
             System.out.println("Server started on port: "+port+"!");
 
             while (true) {
                 clientSocket = ss.accept();
-                clientId++;
-                clientHandler = new ClientHandler(this, clientSocket, clientId);
+
+                clientHandler = new ClientHandler(this, clientSocket);
                 clientHandler.setCurrentGroup(Server.getMainGroup());
                 clientsList.add(clientHandler);
                 clientHandler.start();
@@ -54,6 +52,10 @@ public class Server extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public int getNewClientId() {
+        return ++ clientId;
     }
 
     public static GroupHandler getMainGroup() {

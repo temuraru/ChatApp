@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Random;
 
 public class GroupHandler {
@@ -123,11 +122,9 @@ public class GroupHandler {
             case GroupHandler.TYPE_PRIVATE:
                 suffix = "[*]";
                 break;
-
             case GroupHandler.TYPE_CLOSED:
                 suffix = "[**]";
                 break;
-
         }
 
         return suffix;

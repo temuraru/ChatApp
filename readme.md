@@ -7,12 +7,14 @@ There are some classes :
 - ClientHandler - handles client
 
 # Commands:
+!Any line that doesn't begin with "/" is considered a text to be broadcast to the current group
 ## Guest commands:
 - /help
 - /quit
 - /login <user_name>
 - /list - list all available chat groups
 - /speak <message> - deliver message to the current group
+- /info - display user & group info
 ## Normal user commands:
 - /logoff # = /quit
 - /user <new_username>
@@ -55,17 +57,18 @@ Groups can be:
 
 A normal user can:
 - create a group - and then it receives super-admin role in that group
-- join a group (after an invite message from an admin or simply by using join after list groups command)
+- join a public group (or save an interest about private/closed groups)
 - leave a group (by his own or by being kicked)
-- send invite requests to the server for private groups (to forward the request to groups' admins)
+- send invite requests to private groups (to the groups' admins)
+- accept invites from admins in closed groups
 
-In a group, a super-admin can:
-- not be kicked (being super-admin!)
+In a group, an admin can:
 - invite users to the group (specific message for join group)
 - kick users from the group (reason for kicking [because!])
 - promote/demote users to/from admin role
 
-In a group, an admin can:
+In a group, a super-admin can:
+- not be kicked (being super-admin!)
 - invite users to the group (specific message for join group)
 - kick users from the group (reason for kicking [because!])
 - promote/demote users to/from admin role
@@ -76,7 +79,16 @@ Client interface:
 - sidebar with available groups and "create new group" section with input field & button
 
 
+## Run commands examples: 
+### server:
+REM "C:\Program Files\Java\jdk-9.0.4\bin\java.exe" -javaagent:C:\Users\teodor.muraru\AppData\Local\JetBrains\Toolbox\apps\IDEA-C\ch-0\181.5087.20\lib\idea_rt.jar=52581:C:\Users\teodor.muraru\AppData\Local\JetBrains\Toolbox\apps\IDEA-C\ch-0\181.5087.20\bin -Dfile.encoding=UTF-8 -classpath D:\work\IdeaProjects\retele\proiect\ChatApp\out\production\ServerApp;D:\work\IdeaProjects\retele\proiect\ChatApp\ServerApp\lib\commons-lang3-3.7.jar com.temuraru.ServerMain
+java.exe -javaagent:"C:\Users\teodor.muraru\AppData\Local\JetBrains\Toolbox\apps\IDEA-C\ch-0\181.5087.20\lib\idea_rt.jar"=52581:"C:\Users\teodor.muraru\AppData\Local\JetBrains\Toolbox\apps\IDEA-C\ch-0\181.5087.20\bin" -Dfile.encoding=UTF-8 -classpath "D:\work\IdeaProjects\retele\proiect\ChatApp\out\production\ServerApp;D:\work\IdeaProjects\retele\proiect\ChatApp\ServerApp\lib\commons-lang3-3.7.jar" com.temuraru.ServerMain
+Server started on port: 8867!
+### client/console:
+telnet localhost 8867
 
+
+## TODO:
 Each tab has a conversation field and am input field + Send button at the bottom
 The input field can send messages to the group/another client or commands (statements starting with / or \) to the server
 Tab name = group name or username

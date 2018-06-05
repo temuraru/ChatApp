@@ -26,11 +26,11 @@ public class ClientHandler extends Thread {
         updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, Server.ROLE_SERVER_BOT);
         this.processor = new CommandProcessor(this, server);
     }
-    public ClientHandler(Server server, Socket clientSocket, int clientId) {
+    public ClientHandler(Server server, Socket clientSocket) {
         this.server = server;
         this.clientSocket = clientSocket;
-        this.clientId = clientId;
-        this.username = "guest" + clientId;
+        this.clientId = server.getNewClientId();
+        this.username = "guest" + this.clientId;
         updateRoleInCurrentGroup(Server.MAIN_GROUP_ID, Server.ROLE_GUEST);
         this.processor = new CommandProcessor(this, server);
     }
@@ -45,15 +45,15 @@ public class ClientHandler extends Thread {
     }
 
     private void handleClientSocket() throws Exception {
-        welcome();
+        this.welcome();
 
         this.setClientOutputStream(clientSocket.getOutputStream());
         InputStream clientInputStream = clientSocket.getInputStream();
 
-        outputGroupInfo();
+        this.outputGroupInfo();
         this.processCommands(clientInputStream);
 
-        goodbye();
+        this.goodbye();
     }
 
     public int getClientId() {
@@ -82,7 +82,7 @@ public class ClientHandler extends Thread {
 
     public void setCurrentGroup(GroupHandler newGroup) {
         this.currentGroup = newGroup;
-        setCurrentGroupId(newGroup.getId());
+        this.setCurrentGroupId(newGroup.getId());
     }
 
     public void setCurrentGroupId(Integer currentGroupId) {
@@ -125,7 +125,6 @@ public class ClientHandler extends Thread {
             if (line.length() == 0) {
                 continue;
             }
-            System.out.println(getUsername()+" [new line -"+line.length()+" chars-]: " + line);
             if (!line.startsWith("/")) {
                 line = "/speak " + line;
             }
@@ -214,9 +213,9 @@ public class ClientHandler extends Thread {
 
     public void welcome() throws IOException {
         String username = this.getUsername();
-        System.out.println("Client: '"+username+"' - Accepted connection: "+username+": " + this.getClientSocket());
+        System.out.println("Client: '"+username+"' connected on socket: " + this.getClientSocket());
 
-        this.receiveMessage("Welcome, '"+username+"!\n Please login with your own username! (letters, digits and '_', starting only with a letter, max 15 characters)\n");
+        this.receiveMessage("Welcome, "+username+"!\n Please login with your own username! (letters, digits and '_', starting only with a letter, max 15 characters)\n");
         this.receiveMessage("Example: /login my_own_username \n");
     }
 
@@ -226,7 +225,7 @@ public class ClientHandler extends Thread {
 
         this.getClientSocket().close();
 
-        System.out.println("Client: '"+ username +"' - Closed connection: " + this.getClientSocket());
+        System.out.println("Client: '"+ username +"' closed connection on socket: " + this.getClientSocket());
     }
 
     public void receiveMessage(String msg) throws IOException {
