@@ -2,11 +2,12 @@ package com.temuraru;
 
 import org.apache.commons.lang3.StringUtils;
 
+import javax.swing.*;
 import java.io.*;
 import java.net.Socket;
 import java.util.*;
 
-public class ClientHandler extends Thread {
+public class ClientHandler {
 
     private int clientId;
     private Server server;
@@ -35,16 +36,16 @@ public class ClientHandler extends Thread {
         this.processor = new CommandProcessor(this, server);
     }
 
-    @Override
-    public void run() {
-        try {
-            handleClientSocket();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    @Override
+//    public void run() {
+//        try {
+//            handleClientSocket();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
-    private void handleClientSocket() throws Exception {
+    public void handleClientSocket() throws Exception {
         welcome();
 
         this.setClientOutputStream(clientSocket.getOutputStream());
@@ -214,9 +215,9 @@ public class ClientHandler extends Thread {
 
     public void welcome() throws IOException {
         String username = this.getUsername();
-        System.out.println("Client: '"+username+"' - Accepted connection: "+username+": " + this.getClientSocket());
+        System.out.println("Client connected as: "+username+" with id: "+getClientId()+". Socket info: " + this.getClientSocket());
 
-        this.receiveMessage("Welcome, '"+username+"!\n Please login with your own username! (letters, digits and '_', starting only with a letter, max 15 characters)\n");
+        this.receiveMessage("Welcome, "+username+"! Your id is: "+getClientId()+"!\n Please login with your own username! (letters, digits and '_', starting only with a letter, max 15 characters)\n");
         this.receiveMessage("Example: /login my_own_username \n");
     }
 
@@ -226,7 +227,7 @@ public class ClientHandler extends Thread {
 
         this.getClientSocket().close();
 
-        System.out.println("Client: '"+ username +"' - Closed connection: " + this.getClientSocket());
+        System.out.println("Client: '"+ username +"' closed connection: " + this.getClientSocket());
     }
 
     public void receiveMessage(String msg) throws IOException {

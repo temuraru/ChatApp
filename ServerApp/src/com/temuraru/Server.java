@@ -1,9 +1,6 @@
 package com.temuraru;
 
-import com.temuraru.Exceptions.GroupNotFoundException;
-
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -21,39 +18,71 @@ public class Server extends Thread {
     public static final Integer MAIN_GROUP_ID = 1;
     public static final String MAIN_GROUP_NAME = "Main";
 
-    private final int port;
+    private final int serverPort;
     private int lastGroupId = MAIN_GROUP_ID;
     private static ArrayList<ClientHandler> clientsList = new ArrayList<>();
     private static ArrayList<GroupHandler> groupsList = new ArrayList<>();
     private static GroupHandler mainGroup;
+    private static int clientId;
     private ClientHandler serverBot;
 
     public Server(int port) {
-        this.port = port;
+        this.serverPort = port;
+        clientId = 0;
+        createServerBot();
     }
 
     @Override
     public void run() {
-        createServerBot();
-
         Socket clientSocket;
         ClientHandler clientHandler;
-        int clientId = 0;
         try {
-            ServerSocket ss = new ServerSocket(port);
-            System.out.println("Server started on port: "+port+"!");
+            ServerSocket ss = new ServerSocket(serverPort);
+            System.out.println("Server started on serverPort: "+ serverPort +"!");
 
             while (true) {
                 clientSocket = ss.accept();
-                clientId++;
-                clientHandler = new ClientHandler(this, clientSocket, clientId);
-                clientHandler.setCurrentGroup(Server.getMainGroup());
-                clientsList.add(clientHandler);
-                clientHandler.start();
+                System.out.println("New client socket: "+clientSocket+"!");
+
+                try {
+                    this.handleClientSocket(clientSocket);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+//                clientHandler.start();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    public void handleClientSocket(Socket  clientSocket) throws IOException {
+        ClientHandler clientHandler = new ClientHandler(this, clientSocket, getNewClientId());
+        clientHandler.setCurrentGroup(Server.getMainGroup());
+        clientsList.add(clientHandler);
+
+        Thread worker = new Thread() {
+            public void run() {
+                try {
+                    clientHandler.handleClientSocket();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        worker.start(); // So we don't hold up the dispatch thread.
+//        clientHandler.welcome();
+//
+//        clientHandler.outputGroupInfo();
+//        clientHandler.processCommands(clientInputStream);
+//
+//        clientHandler.goodbye();
+    }
+
+
+    public static int getNewClientId() {
+        clientId++;
+        System.out.println("New client id: "+clientId+"!");
+        return clientId;
     }
 
     public static GroupHandler getMainGroup() {
