@@ -128,7 +128,7 @@ public class ClientHandler extends Thread {
             if (!line.startsWith("/")) {
                 line = "/speak " + line;
             }
-            System.out.println(getUsername()+" [new line -"+line.length()+" chars-]: " + line);
+            System.out.println(getUsername()+" ["+line.length()+" chars]: " + line);
 
             String[] commandTokens = StringUtils.split(line);
             if (commandTokens != null && commandTokens.length > 0) {
@@ -142,8 +142,9 @@ public class ClientHandler extends Thread {
         // classic way, loop a Map
         for (Map.Entry<Integer, String> entry : this.getGroupsList().entrySet()) {
             GroupHandler group = Server.getGroupById(entry.getKey());
-            String groupInfo = group.getName() + " [id: " + entry.getKey() + "] - role: " + entry.getValue();
-            listing.append((listing.length() == 0 ? "" : "; ") + groupInfo + " " + group.getGroupTypeSuffix());
+            String groupInfo = group.getName() + " " + group.getGroupTypeSuffix();
+            groupInfo += " [id: " + entry.getKey() + "] - role: " + entry.getValue().toUpperCase();
+            listing.append((listing.length() == 0 ? "" : "; ") + groupInfo);
         }
 
         return listing.toString();

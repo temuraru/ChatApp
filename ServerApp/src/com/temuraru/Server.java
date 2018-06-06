@@ -210,7 +210,7 @@ public class Server extends Thread {
         if (Server.getGroupsList().size() > 0) {
             StringBuilder sb = new StringBuilder();
             for (GroupHandler group: Server.getGroupsList()) {
-                sb.append((sb.length() == 0 ? "" : ",") + group.getName() + " " + group.getGroupTypeSuffix());
+                sb.append((sb.length() == 0 ? "" : ", ") + group.getName() + " " + group.getGroupTypeSuffix());
             }
             groupInfo = sb.toString();
         }

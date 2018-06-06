@@ -1,10 +1,26 @@
-Mirc-style multi user chat server-client system:
+Mirc-style multi user chat server-client system.
 
-There are some classes :
+# Features
+- connections through sockets
+- each client has its own thread 
+- role-based structure:
+    - controlled access in groups (join for public, request/add/invite/accept invitations for public/private/closed types)
+    - different commands available for each client (GUEST/USER/ADMIN/SUPERADMIN)
+- group chat broadcast / client-to-client talk (with block/unblock options)
+
+# Classes involved:
 - GroupHandler - handles group communication
     - each group has an owner - a ClientHandler instance
-    the mainHall group has the serverBot special ClientHandler instance
+    - the "Main" group has the ServerBot special ClientHandler instance
 - ClientHandler - handles client
+    - transfers each line to a CommandProcessor class for execution
+    - updates its own properties(groups, blockedClients)
+    - requires the server to update its lists of all clients/all groups
+    - transfers groups operation to the GroupHandler class
+- CommandProcessor: execute a current command line from client
+- Server - Handles the clients connections
+    - manages its central lists (groups/clients)
+- ServerMain - launches the server app
 
 # Commands:
 !Any line that doesn't begin with "/" is considered a text to be broadcast to the current group

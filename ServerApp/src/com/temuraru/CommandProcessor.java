@@ -816,8 +816,6 @@ public class CommandProcessor {
 
                 this.client.setUsername(chosenUsername);
 
-                System.out.println("clientOutputStream:");
-                System.out.println(clientOutputStream);
                 clientOutputStream.write("Login OK!\n".getBytes());
                 String msg = "User '" + defaultUsername + "' just logged in as '" + this.client.getUsername() + "'!\n";
                 Server.broadcastMessage(msg, true);
