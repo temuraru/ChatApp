@@ -121,19 +121,23 @@ public class ClientHandler extends Thread {
         BufferedReader buffer = new BufferedReader(new InputStreamReader(clientInputStream));
 
         String line;
-        while ((line = buffer.readLine()) != null) {
-            if (line.length() == 0) {
-                continue;
-            }
-            if (!line.startsWith("/")) {
-                line = "/speak " + line;
-            }
-            System.out.println(getUsername()+" ["+line.length()+" chars]: " + line);
+        try {
+            while ((line = buffer.readLine()) != null) {
+                if (line.length() == 0) {
+                    continue;
+                }
+                if (!line.startsWith("/")) {
+                    line = "/speak " + line;
+                }
+                System.out.println(getUsername()+" ["+line.length()+" chars]: " + line);
 
-            String[] commandTokens = StringUtils.split(line);
-            if (commandTokens != null && commandTokens.length > 0) {
-                this.processor.processCommand(commandTokens);
+                String[] commandTokens = StringUtils.split(line);
+                if (commandTokens != null && commandTokens.length > 0) {
+                    this.processor.processCommand(commandTokens);
+                }
             }
+        } finally {
+            this.getClientSocket().close();
         }
     }
 
